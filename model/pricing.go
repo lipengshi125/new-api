@@ -35,6 +35,7 @@ type Pricing struct {
 	SupportedEndpointTypes []constant.EndpointType `json:"supported_endpoint_types"`
 	BillingMode            string                  `json:"billing_mode,omitempty"`
 	BillingExpr            string                  `json:"billing_expr,omitempty"`
+	BillingUnit            string                  `json:"billing_unit,omitempty"`
 	PricingVersion         string                  `json:"pricing_version,omitempty"`
 }
 
@@ -337,6 +338,7 @@ func updatePricing() {
 				pricing.BillingExpr = expr
 			}
 		}
+		pricing.BillingUnit = ratio_setting.GetBillingUnit(model)
 		pricingMap = append(pricingMap, pricing)
 	}
 

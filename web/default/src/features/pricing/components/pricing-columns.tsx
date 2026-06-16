@@ -225,7 +225,7 @@ export function usePricingColumns(
           <div className='max-w-full min-w-0'>
             <span className='font-mono text-sm tabular-nums'>{price}</span>
             <div className='text-muted-foreground/50 text-[10px]'>
-              / {t('request')}
+              / {model.billing_unit === 'second' ? t('sec') : t('request')}
             </div>
           </div>
         )

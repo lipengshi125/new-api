@@ -748,7 +748,7 @@ export const calculateModelPrice = ({
   }
 
   if (record.quota_type === 1) {
-    // 按次计费
+    // 按次计费 / 按秒计费
     const priceUSD = parseFloat(record.model_price) * usedGroupRatio;
     const displayVal = displayPrice(priceUSD);
 
@@ -756,6 +756,7 @@ export const calculateModelPrice = ({
       price: displayVal,
       isPerToken: false,
       isTokensDisplay: false,
+      billingUnit: record.billing_unit || '',
       usedGroup,
       usedGroupRatio,
     };
@@ -891,7 +892,7 @@ export const getModelPriceItems = (
       key: 'fixed',
       label: t('模型价格'),
       value: priceData.price,
-      suffix: ` / ${t('次')}`,
+      suffix: ` / ${priceData.billingUnit === 'second' ? t('秒') : t('次')}`,
     },
   ].filter((item) => item.value !== null && item.value !== undefined && item.value !== '');
 };

@@ -161,9 +161,10 @@ const PricingCardView = ({
       </Tag>
     );
     if (record.quota_type === 1) {
+      const label = record.billing_unit === 'second' ? t('按秒计费') : t('按次计费');
       billingTag = (
         <Tag key='billing' shape='circle' color='teal' size='small'>
-          {t('按次计费')}
+          {label}
         </Tag>
       );
     } else if (record.quota_type === 0) {

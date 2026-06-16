@@ -1101,6 +1101,7 @@
     "按倍率类型筛选": "按倍率类型筛选",
     "按倍率设置": "按倍率设置",
     "按次计费": "按次计费",
+    "按秒计费": "按秒计费",
     "按照如下格式输入：AccessKey|SecretAccessKey|Region": "按照如下格式输入：AccessKey|SecretAccessKey|Region",
     "按量计费": "按量计费",
     "按顺序替换content中的变量占位符": "按顺序替换content中的变量占位符",

@@ -759,3 +759,18 @@ func GetModelRatioOrPrice(model string) (float64, bool, bool) { // price or rati
 	}
 	return 37.5, false, false
 }
+
+// billingUnitSecondsPrefixes lists model name prefixes that bill per second.
+var billingUnitSecondsPrefixes = []string{
+	"kling-", "sora-", "veo-", "wan2.", "wanx2.",
+}
+
+// GetBillingUnit returns "second" if the model is known to bill per second, "" otherwise.
+func GetBillingUnit(name string) string {
+	for _, prefix := range billingUnitSecondsPrefixes {
+		if strings.HasPrefix(name, prefix) {
+			return "second"
+		}
+	}
+	return ""
+}

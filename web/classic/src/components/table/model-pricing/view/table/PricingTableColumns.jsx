@@ -33,23 +33,15 @@ import {
 } from '../../../../common/ui/RenderUtils';
 import { useIsMobile } from '../../../../../hooks/common/useIsMobile';
 
-function renderQuotaType(type, t) {
-  switch (type) {
-    case 1:
-      return (
-        <Tag color='teal' shape='circle'>
-          {t('按次计费')}
-        </Tag>
-      );
-    case 0:
-      return (
-        <Tag color='violet' shape='circle'>
-          {t('按量计费')}
-        </Tag>
-      );
-    default:
-      return t('未知');
+function renderQuotaType(type, record, t) {
+  if (type === 1) {
+    const label = record?.billing_unit === 'second' ? t('按秒计费') : t('按次计费');
+    return <Tag color='teal' shape='circle'>{label}</Tag>;
   }
+  if (type === 0) {
+    return <Tag color='violet' shape='circle'>{t('按量计费')}</Tag>;
+  }
+  return t('未知');
 }
 
 // Render vendor name
@@ -159,9 +151,7 @@ export const getPricingTableColumns = ({
   const quotaColumn = {
     title: t('计费类型'),
     dataIndex: 'quota_type',
-    render: (text, record, index) => {
-      return renderQuotaType(parseInt(text), t);
-    },
+    render: (text, record) => renderQuotaType(parseInt(text), record, t),
     sorter: (a, b) => a.quota_type - b.quota_type,
   };
 

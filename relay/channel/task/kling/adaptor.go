@@ -291,6 +291,21 @@ func (a *TaskAdaptor) FetchTask(baseUrl, key string, body map[string]any, proxy 
 	return client.Do(req)
 }
 
+func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInfo) map[string]float64 {
+	req, err := relaycommon.GetTaskRequest(c)
+	if err != nil {
+		return nil
+	}
+	seconds := req.Duration
+	if s, err := strconv.Atoi(req.Seconds); err == nil && s > 0 {
+		seconds = s
+	}
+	if seconds <= 0 {
+		seconds = 5 // kling default duration
+	}
+	return map[string]float64{"seconds": float64(seconds)}
+}
+
 func (a *TaskAdaptor) GetModelList() []string {
 	return []string{"kling-v1", "kling-v1-6", "kling-v2-master"}
 }
