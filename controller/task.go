@@ -81,6 +81,21 @@ func tasksToDto(tasks []*model.Task, fillUser bool) []*dto.TaskDto {
 			}
 		}
 	}
+
+	// Batch collect unique token IDs for name lookup
+	tokenNameMap := make(map[int]string)
+	tokenIdSet := types.NewSet[int]()
+	for _, task := range tasks {
+		if task.PrivateData.TokenId > 0 {
+			tokenIdSet.Add(task.PrivateData.TokenId)
+		}
+	}
+	for _, tokenId := range tokenIdSet.Items() {
+		if token, err := model.GetTokenById(tokenId); err == nil && token != nil {
+			tokenNameMap[tokenId] = token.Name
+		}
+	}
+
 	result := make([]*dto.TaskDto, len(tasks))
 	for i, task := range tasks {
 		if fillUser {
@@ -88,7 +103,11 @@ func tasksToDto(tasks []*model.Task, fillUser bool) []*dto.TaskDto {
 				task.Username = user.Username
 			}
 		}
-		result[i] = relay.TaskModel2Dto(task)
+		d := relay.TaskModel2Dto(task)
+		if task.PrivateData.TokenId > 0 {
+			d.TokenName = tokenNameMap[task.PrivateData.TokenId]
+		}
+		result[i] = d
 	}
 	return result
 }

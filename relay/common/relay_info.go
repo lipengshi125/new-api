@@ -736,13 +736,33 @@ func (t *TaskSubmitReq) UnmarshalJSON(data []byte) error {
 			var metadataObj map[string]interface{}
 			if err := common.Unmarshal([]byte(metadataStr), &metadataObj); err == nil {
 				t.Metadata = metadataObj
-				return nil
+			}
+		} else {
+			var metadataObj map[string]interface{}
+			if err := common.Unmarshal(aux.Metadata, &metadataObj); err == nil {
+				t.Metadata = metadataObj
 			}
 		}
+	}
 
-		var metadataObj map[string]interface{}
-		if err := common.Unmarshal(aux.Metadata, &metadataObj); err == nil {
-			t.Metadata = metadataObj
+	// Capture unknown flat fields into Metadata so downstream adaptors (e.g. Kling relay)
+	// can read ratio/quality/sound/end_image/reference_video etc. from /v1/videos routes.
+	var allFields map[string]interface{}
+	if err := common.Unmarshal(data, &allFields); err == nil {
+		knownFields := map[string]bool{
+			"prompt": true, "model": true, "mode": true, "image": true,
+			"images": true, "size": true, "duration": true, "seconds": true,
+			"input_reference": true, "metadata": true,
+		}
+		if t.Metadata == nil {
+			t.Metadata = make(map[string]interface{})
+		}
+		for k, v := range allFields {
+			if !knownFields[k] {
+				if _, exists := t.Metadata[k]; !exists {
+					t.Metadata[k] = v
+				}
+			}
 		}
 	}
 

@@ -111,7 +111,7 @@ func (a *TaskAdaptor) EstimateBilling(c *gin.Context, info *relaycommon.RelayInf
 		seconds = req.Duration
 	}
 	if seconds <= 0 {
-		seconds = 4
+		seconds = 1
 	}
 
 	size := req.Size

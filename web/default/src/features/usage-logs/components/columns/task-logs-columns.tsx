@@ -26,8 +26,8 @@ import { formatTimestampToDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { StatusBadge } from '@/components/status-badge'
-import { TASK_ACTIONS, TASK_STATUS } from '../../constants'
-import { taskActionMapper, taskStatusMapper } from '../../lib/mappers'
+import { TASK_PLATFORM_MAPPINGS, TASK_STATUS } from '../../constants'
+import { taskPlatformMapper, taskStatusMapper } from '../../lib/mappers'
 import type { TaskLog } from '../../types'
 import {
   AudioPreviewDialog,
@@ -39,6 +39,7 @@ import {
   createDurationColumn,
   createChannelColumn,
   createProgressColumn,
+  createTimestampColumn,
 } from './column-helpers'
 
 function parseTaskData(data: unknown): unknown[] {
@@ -52,6 +53,31 @@ function parseTaskData(data: unknown): unknown[] {
     }
   }
   return []
+}
+
+/** Recursively extract all { url, isVideo } pairs from a JSON blob. */
+function extractMediaUrls(
+  obj: unknown
+): Array<{ url: string; isVideo: boolean }> {
+  const results: Array<{ url: string; isVideo: boolean }> = []
+  function walk(node: unknown) {
+    if (!node || typeof node !== 'object') return
+    if (Array.isArray(node)) {
+      node.forEach(walk)
+      return
+    }
+    const rec = node as Record<string, unknown>
+    for (const [k, v] of Object.entries(rec)) {
+      if (k === 'url' && typeof v === 'string' && v.startsWith('http')) {
+        const isVideo = /\.(mp4|mov|webm|m3u8)/i.test(v)
+        results.push({ url: v, isVideo })
+      } else {
+        walk(v)
+      }
+    }
+  }
+  walk(obj)
+  return results
 }
 
 function AudioPreviewCell({ log }: { log: TaskLog }) {
@@ -88,32 +114,115 @@ function AudioPreviewCell({ log }: { log: TaskLog }) {
   )
 }
 
+function MediaPreviewCell({ log }: { log: TaskLog }) {
+  const media = useMemo(() => {
+    if (log.status !== TASK_STATUS.SUCCESS || !log.data) return []
+    try {
+      const parsed =
+        typeof log.data === 'string' ? JSON.parse(log.data) : log.data
+      return extractMediaUrls(parsed)
+    } catch {
+      return []
+    }
+  }, [log.data, log.status])
+
+  if (media.length === 0) return null
+
+  return (
+    <div className='flex flex-wrap gap-1'>
+      {media.map((item, i) =>
+        item.isVideo ? (
+          <a
+            key={i}
+            href={item.url}
+            target='_blank'
+            rel='noopener noreferrer'
+            className='block'
+          >
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <video
+              src={item.url}
+              className='h-14 w-14 cursor-pointer rounded object-cover'
+              muted
+            />
+          </a>
+        ) : (
+          <a
+            key={i}
+            href={item.url}
+            target='_blank'
+            rel='noopener noreferrer'
+            className='block'
+          >
+            <img
+              src={item.url}
+              className='h-14 w-14 cursor-pointer rounded object-cover'
+              alt=''
+            />
+          </a>
+        )
+      )}
+    </div>
+  )
+}
+
 export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
   const { t } = useTranslation()
   const columns: ColumnDef<TaskLog>[] = [
+    // 提交时间
     {
       accessorKey: 'submit_time',
       header: t('Submit Time'),
       cell: ({ row }) => {
-        const log = row.original
         const submitTime = row.getValue('submit_time') as number
-
         return (
-          <div className='flex min-w-0 flex-col gap-0.5'>
-            <span className='truncate font-mono text-xs tabular-nums'>
-              {formatTimestampToDate(submitTime, 'seconds')}
-            </span>
-            {log.finish_time ? (
-              <span className='text-muted-foreground/60 truncate font-mono text-[11px] tabular-nums'>
-                {formatTimestampToDate(log.finish_time, 'seconds')}
-              </span>
-            ) : (
-              <span className='text-muted-foreground/50 text-[11px]'>-</span>
-            )}
-          </div>
+          <span className='font-mono text-xs tabular-nums'>
+            {formatTimestampToDate(submitTime, 'seconds')}
+          </span>
         )
       },
-      size: 180,
+      size: 150,
+    },
+    // 结束时间
+    createTimestampColumn<TaskLog>({
+      accessorKey: 'finish_time',
+      title: t('Finish Time'),
+      unit: 'seconds',
+    }),
+    // 花费时间
+    createDurationColumn<TaskLog>({
+      submitTimeKey: 'submit_time',
+      finishTimeKey: 'finish_time',
+      unit: 'seconds',
+      headerLabel: t('Duration'),
+      warningThresholdSec: 300,
+    }),
+    // 平台
+    {
+      accessorKey: 'platform',
+      header: t('Platform'),
+      cell: ({ row }) => {
+        const platform = row.getValue('platform') as string
+        if (!platform)
+          return <span className='text-muted-foreground/60 text-xs'>-</span>
+        return (
+          <StatusBadge
+            label={taskPlatformMapper.getLabel(platform, platform)}
+            variant={
+              (TASK_PLATFORM_MAPPINGS[platform]?.variant as
+                | 'green'
+                | 'blue'
+                | 'violet'
+                | 'orange'
+                | 'pink'
+                | undefined) ?? 'neutral'
+            }
+            size='sm'
+            copyable={false}
+            className='-ml-1.5'
+          />
+        )
+      },
     },
   ]
 
@@ -161,38 +270,46 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
   }
 
   columns.push(
+    // 令牌名称
+    {
+      accessorKey: 'token_name',
+      header: t('Token Name'),
+      cell: ({ row }) => {
+        const tokenName = row.getValue('token_name') as string
+        if (!tokenName)
+          return <span className='text-muted-foreground/60 text-xs'>-</span>
+        return (
+          <StatusBadge
+            label={tokenName}
+            autoColor={tokenName}
+            size='sm'
+            copyable={false}
+            className='border-border/60 bg-muted/30 max-w-[120px] truncate rounded-md border px-1.5 py-0.5'
+          />
+        )
+      },
+    },
+    // 任务ID
     {
       accessorKey: 'task_id',
       header: t('Task ID'),
       cell: ({ row }) => {
-        const log = row.original
         const taskId = row.getValue('task_id') as string
         if (!taskId) {
           return <span className='text-muted-foreground/60 text-xs'>-</span>
         }
         return (
-          <div className='flex max-w-[170px] flex-col gap-0.5'>
-            <StatusBadge
-              label={taskId}
-              autoColor={taskId}
-              size='sm'
-              className='border-border/60 bg-muted/30 max-w-full truncate rounded-md border px-1.5 py-0.5 font-mono'
-            />
-            <span className='text-muted-foreground/60 truncate text-[11px]'>
-              {t(log.platform)} · {t(taskActionMapper.getLabel(log.action))}
-            </span>
-          </div>
+          <StatusBadge
+            label={taskId}
+            autoColor={taskId}
+            size='sm'
+            className='border-border/60 bg-muted/30 max-w-[170px] truncate rounded-md border px-1.5 py-0.5 font-mono'
+          />
         )
       },
       meta: { mobileTitle: true },
     },
-    createDurationColumn<TaskLog>({
-      submitTimeKey: 'submit_time',
-      finishTimeKey: 'finish_time',
-      unit: 'seconds',
-      headerLabel: t('Duration'),
-      warningThresholdSec: 300,
-    }),
+    // 任务状态
     {
       accessorKey: 'status',
       header: t('Status'),
@@ -209,7 +326,22 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
         )
       },
     },
+    // 进度
     createProgressColumn<TaskLog>({ headerLabel: t('Progress') }),
+    // 计费单位
+    {
+      accessorKey: 'billing_seconds',
+      header: t('Billing'),
+      cell: ({ row }) => {
+        const seconds = row.original.billing_seconds
+        if (seconds && seconds > 0) {
+          return <span className='font-mono text-xs tabular-nums'>{seconds}s</span>
+        }
+        return <span className='font-mono text-xs tabular-nums'>1{t('count-unit')}</span>
+      },
+      size: 80,
+    },
+    // 详情
     {
       accessorKey: 'fail_reason',
       header: t('Details'),
@@ -219,6 +351,7 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
         const status = log.status
         const [dialogOpen, setDialogOpen] = useState(false)
 
+        // Suno: audio preview
         const isSunoSuccess =
           log.platform === 'suno' && status === TASK_STATUS.SUCCESS
         if (isSunoSuccess) {
@@ -235,27 +368,18 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
           }
         }
 
-        const isVideoTask =
-          log.action === TASK_ACTIONS.GENERATE ||
-          log.action === TASK_ACTIONS.TEXT_GENERATE ||
-          log.action === TASK_ACTIONS.FIRST_TAIL_GENERATE ||
-          log.action === TASK_ACTIONS.REFERENCE_GENERATE ||
-          log.action === TASK_ACTIONS.REMIX_GENERATE
-        const isSuccess = status === TASK_STATUS.SUCCESS
-        const isUrl = failReason?.startsWith('http')
-
-        if (isSuccess && isVideoTask && isUrl) {
-          const videoUrl = `/v1/videos/${log.task_id}/content`
-          return (
-            <a
-              href={videoUrl}
-              target='_blank'
-              rel='noopener noreferrer'
-              className='text-foreground text-xs hover:underline'
-            >
-              {t('Click to preview video')}
-            </a>
-          )
+        // Video/image: extract URLs from data and render thumbnails
+        if (status === TASK_STATUS.SUCCESS && log.data) {
+          try {
+            const parsed =
+              typeof log.data === 'string' ? JSON.parse(log.data) : log.data
+            const media = extractMediaUrls(parsed)
+            if (media.length > 0) {
+              return <MediaPreviewCell log={log} />
+            }
+          } catch {
+            // fall through to fail_reason
+          }
         }
 
         if (!failReason) {
@@ -283,7 +407,7 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
         )
       },
       size: 200,
-      maxSize: 220,
+      maxSize: 300,
     }
   )
 

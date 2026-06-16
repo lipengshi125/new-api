@@ -119,7 +119,7 @@ func ResolveOriginTask(c *gin.Context, info *relaycommon.RelayInfo) *dto.TaskErr
 			secondsStr, _ := taskData["seconds"].(string)
 			seconds, _ := strconv.Atoi(secondsStr)
 			if seconds <= 0 {
-				seconds = 4
+				seconds = 1
 			}
 			sizeStr, _ := taskData["size"].(string)
 			if info.PriceData.OtherRatios == nil {
@@ -539,7 +539,7 @@ func mapTaskStatusToSimple(status model.TaskStatus) string {
 }
 
 func TaskModel2Dto(task *model.Task) *dto.TaskDto {
-	return &dto.TaskDto{
+	d := &dto.TaskDto{
 		ID:         task.ID,
 		CreatedAt:  task.CreatedAt,
 		UpdatedAt:  task.UpdatedAt,
@@ -561,4 +561,10 @@ func TaskModel2Dto(task *model.Task) *dto.TaskDto {
 		Username:   task.Username,
 		Data:       task.Data,
 	}
+	if bc := task.PrivateData.BillingContext; bc != nil {
+		if s := bc.OtherRatios["seconds"]; s > 0 {
+			d.BillingSeconds = s
+		}
+	}
+	return d
 }

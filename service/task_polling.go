@@ -87,10 +87,10 @@ func sweepTimedOutTasks(ctx context.Context) {
 	}
 }
 
-// TaskPollingLoop 主轮询循环，每 15 秒检查一次未完成的任务
+// TaskPollingLoop 主轮询循环，每 5 秒检查一次未完成的任务
 func TaskPollingLoop() {
 	for {
-		time.Sleep(time.Duration(15) * time.Second)
+		time.Sleep(time.Duration(5) * time.Second)
 		common.SysLog("任务进度轮询开始")
 		ctx := context.TODO()
 		sweepTimedOutTasks(ctx)
@@ -335,8 +335,8 @@ func updateVideoTasks(ctx context.Context, platform constant.TaskPlatform, chann
 		if err := updateVideoSingleTask(ctx, adaptor, cacheGetChannel, taskId, taskM); err != nil {
 			logger.LogError(ctx, fmt.Sprintf("Failed to update video task %s: %s", taskId, err.Error()))
 		}
-		// sleep 1 second between each task to avoid hitting rate limits of upstream platforms
-		time.Sleep(1 * time.Second)
+		// sleep 200ms between each task to avoid hitting rate limits of upstream platforms
+		time.Sleep(200 * time.Millisecond)
 	}
 	return nil
 }

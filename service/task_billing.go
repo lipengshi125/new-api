@@ -19,9 +19,13 @@ import (
 func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 	tokenName := c.GetString("token_name")
 	logContent := fmt.Sprintf("操作 %s", info.Action)
-	// 支持任务仅按次计费
+	// 支持任务按次或按秒计费
 	if common.StringsContains(constant.TaskPricePatches, info.OriginModelName) {
-		logContent = fmt.Sprintf("%s，按次计费", logContent)
+		if s := info.PriceData.OtherRatios["seconds"]; s > 0 {
+			logContent = fmt.Sprintf("%s，按%.0f秒计费", logContent, s)
+		} else {
+			logContent = fmt.Sprintf("%s，按次计费", logContent)
+		}
 	} else {
 		if len(info.PriceData.OtherRatios) > 0 {
 			var contents []string

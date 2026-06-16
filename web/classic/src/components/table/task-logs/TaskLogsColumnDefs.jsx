@@ -382,6 +382,17 @@ export const getTaskLogsColumns = ({
       },
     },
     {
+      key: COLUMN_KEYS.BILLING,
+      title: t('计费'),
+      dataIndex: 'billing_seconds',
+      render: (seconds, record) => {
+        if (seconds && seconds > 0) {
+          return <Tag color='blue' shape='circle'>{seconds}{t('秒')}</Tag>;
+        }
+        return <Tag color='grey' shape='circle'>1{t('次')}</Tag>;
+      },
+    },
+    {
       key: COLUMN_KEYS.FAIL_REASON,
       title: t('详情'),
       dataIndex: 'fail_reason',
@@ -426,7 +437,7 @@ export const getTaskLogsColumns = ({
                 openVideoModal(resultUrl);
               }}
             >
-              {t('点击预览视频')}
+              {t('点击预览结果')}
             </a>
           );
         }

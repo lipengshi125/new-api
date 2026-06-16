@@ -73,6 +73,30 @@ type requestPayload struct {
 	ExternalTaskId string         `json:"external_task_id,omitempty"`
 }
 
+// relayRequestPayload is used when forwarding to another new-api relay (sk- key).
+// It mirrors the simplified flat format the downstream relay expects.
+type relayRequestPayload struct {
+	Prompt            string         `json:"prompt,omitempty"`
+	Model             string         `json:"model,omitempty"`
+	Image             string         `json:"image,omitempty"`
+	EndImage          string         `json:"end_image,omitempty"`
+	Images            []string       `json:"images,omitempty"`
+	Duration          *int           `json:"duration,omitempty"`
+	Ratio             string         `json:"ratio,omitempty"`
+	Quality           *string        `json:"quality,omitempty"`
+	Sound             *string        `json:"sound,omitempty"`
+	ReferenceVideo    string         `json:"reference_video,omitempty"`
+	VideoDuration     *int           `json:"video_duration,omitempty"`
+	KeepOriginalSound *string        `json:"keep_original_sound,omitempty"`
+	ReferenceMode     string         `json:"referenceMode,omitempty"`
+	NegativePrompt    string         `json:"negative_prompt,omitempty"`
+	StaticMask        string         `json:"static_mask,omitempty"`
+	DynamicMasks      []DynamicMask  `json:"dynamic_masks,omitempty"`
+	CameraControl     *CameraControl `json:"camera_control,omitempty"`
+	CallbackUrl       string         `json:"callback_url,omitempty"`
+	ExternalTaskId    string         `json:"external_task_id,omitempty"`
+}
+
 type responsePayload struct {
 	Code      int    `json:"code"`
 	Message   string `json:"message"`
@@ -165,16 +189,32 @@ func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayIn
 	}
 	req := v.(relaycommon.TaskSubmitReq)
 
-	body, err := a.convertToRequestPayload(&req, info)
+	var hasImage bool
+	var data []byte
+	var err error
+
+	if isNewAPIRelay(a.apiKey) {
+		var body *relayRequestPayload
+		body, err = a.convertToRelayPayload(&req, info)
+		if err != nil {
+			return nil, err
+		}
+		hasImage = body.Image != "" || body.EndImage != "" || len(body.Images) > 0
+		data, err = common.Marshal(body)
+	} else {
+		var body *requestPayload
+		body, err = a.convertToRequestPayload(&req, info)
+		if err != nil {
+			return nil, err
+		}
+		hasImage = body.Image != "" || body.ImageTail != ""
+		data, err = common.Marshal(body)
+	}
 	if err != nil {
 		return nil, err
 	}
-	if body.Image == "" && body.ImageTail == "" {
+	if !hasImage {
 		c.Set("action", constant.TaskActionTextGenerate)
-	}
-	data, err := common.Marshal(body)
-	if err != nil {
-		return nil, err
 	}
 	return bytes.NewReader(data), nil
 }
@@ -262,6 +302,31 @@ func (a *TaskAdaptor) GetChannelName() string {
 // ============================
 // helpers
 // ============================
+
+// convertToRelayPayload builds the simplified flat payload for sk- relay upstream.
+func (a *TaskAdaptor) convertToRelayPayload(req *relaycommon.TaskSubmitReq, info *relaycommon.RelayInfo) (*relayRequestPayload, error) {
+	model := info.UpstreamModelName
+	if model == "" {
+		model = req.Model
+	}
+	r := relayRequestPayload{
+		Prompt: req.Prompt,
+		Model:  model,
+		Image:  req.Image,
+		Images: req.Images,
+	}
+	if req.Duration > 0 {
+		r.Duration = &req.Duration
+	} else if req.Seconds != "" {
+		if v, err := strconv.Atoi(req.Seconds); err == nil && v > 0 {
+			r.Duration = &v
+		}
+	}
+	if err := taskcommon.UnmarshalMetadata(req.Metadata, &r); err != nil {
+		return nil, errors.Wrap(err, "unmarshal metadata failed")
+	}
+	return &r, nil
+}
 
 func (a *TaskAdaptor) convertToRequestPayload(req *relaycommon.TaskSubmitReq, info *relaycommon.RelayInfo) (*requestPayload, error) {
 	r := requestPayload{

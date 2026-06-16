@@ -256,9 +256,10 @@ export interface TaskLog {
   id: number
   user_id: number
   username?: string
-  platform: string // suno, kling, runway, etc.
+  token_name?: string
+  platform: string
   task_id: string
-  action: string // MUSIC, LYRICS, GENERATE, TEXT_GENERATE, etc.
+  action: string
   channel_id: number
   submit_time: number // seconds
   finish_time?: number // seconds
@@ -266,10 +267,11 @@ export interface TaskLog {
   progress_message_en?: string
   data?: string // JSON string
   fail_reason?: string
-  status: string // NOT_START, SUBMITTED, IN_PROGRESS, SUCCESS, FAILURE, QUEUED, UNKNOWN
+  status: string
   other?: string
   created_at?: number
   updated_at?: number
+  billing_seconds?: number // >0 表示按秒计费（秒数）；0/undefined 表示按次计费
 }
 
 // ============================================================================
