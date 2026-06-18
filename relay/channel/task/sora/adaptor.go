@@ -51,7 +51,10 @@ type responseTask struct {
 	Seconds            string `json:"seconds,omitempty"`
 	Size               string `json:"size,omitempty"`
 	RemixedFromVideoID string `json:"remixed_from_video_id,omitempty"`
-	Error              *struct {
+	Data               *struct {
+		Duration float64 `json:"duration,omitempty"`
+	} `json:"data,omitempty"`
+	Error *struct {
 		Message string `json:"message"`
 		Code    string `json:"code"`
 	} `json:"error,omitempty"`
@@ -302,7 +305,7 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 		taskResult.Status = model.TaskStatusQueued
 	case "processing", "in_progress":
 		taskResult.Status = model.TaskStatusInProgress
-	case "completed":
+	case "completed", "succeeded":
 		taskResult.Status = model.TaskStatusSuccess
 		// Url intentionally left empty — the caller constructs the proxy URL using the public task ID
 	case "failed", "cancelled":
