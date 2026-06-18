@@ -24,6 +24,20 @@ import { useTranslation } from 'react-i18next';
 
 const { Text } = Typography;
 
+// 根据 URL 扩展名判断媒体类型
+const IMAGE_EXT_REGEX = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i;
+const VIDEO_EXT_REGEX = /\.(mp4|webm|mov|m4v)(\?|$)/i;
+const AUDIO_EXT_REGEX = /\.(mp3|wav|ogg|m4a|flac|aac)(\?|$)/i;
+
+const getMediaType = (url) => {
+  if (typeof url !== 'string') return 'video';
+  if (IMAGE_EXT_REGEX.test(url)) return 'image';
+  if (AUDIO_EXT_REGEX.test(url)) return 'audio';
+  if (VIDEO_EXT_REGEX.test(url)) return 'video';
+  // 未知扩展名（如带鉴权的 API 端点）默认按视频处理，保持旧行为
+  return 'video';
+};
+
 const ContentModal = ({
   isModalOpen,
   setIsModalOpen,
@@ -31,22 +45,24 @@ const ContentModal = ({
   isVideo,
 }) => {
   const { t } = useTranslation();
-  const [videoError, setVideoError] = useState(false);
+  const [mediaError, setMediaError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  const mediaType = getMediaType(modalContent);
 
   useEffect(() => {
     if (isModalOpen && isVideo) {
-      setVideoError(false);
-      setIsLoading(true);
+      setMediaError(false);
+      setIsLoading(mediaType !== 'image' ? true : false);
     }
-  }, [isModalOpen, isVideo]);
+  }, [isModalOpen, isVideo, modalContent, mediaType]);
 
-  const handleVideoError = () => {
-    setVideoError(true);
+  const handleMediaError = () => {
+    setMediaError(true);
     setIsLoading(false);
   };
 
-  const handleVideoLoaded = () => {
+  const handleMediaLoaded = () => {
     setIsLoading(false);
   };
 
@@ -58,15 +74,21 @@ const ContentModal = ({
     window.open(modalContent, '_blank');
   };
 
-  const renderVideoContent = () => {
-    if (videoError) {
+  const renderMediaContent = () => {
+    if (mediaError) {
+      const errorTitle =
+        mediaType === 'image'
+          ? t('图片无法在当前浏览器中加载，这可能是由于：')
+          : mediaType === 'audio'
+            ? t('音频无法在当前浏览器中播放，这可能是由于：')
+            : t('视频无法在当前浏览器中播放，这可能是由于：');
       return (
         <div style={{ textAlign: 'center', padding: '40px' }}>
           <Text
             type='tertiary'
             style={{ display: 'block', marginBottom: '16px' }}
           >
-            {t('视频无法在当前浏览器中播放，这可能是由于：')}
+            {errorTitle}
           </Text>
           <Text
             type='tertiary'
@@ -119,6 +141,14 @@ const ContentModal = ({
       );
     }
 
+    const mediaStyle = {
+      width: '100%',
+      height: '100%',
+      maxWidth: '100%',
+      maxHeight: '100%',
+      objectFit: 'contain',
+    };
+
     return (
       <div style={{ position: 'relative', height: '100%' }}>
         {isLoading && (
@@ -134,20 +164,42 @@ const ContentModal = ({
             <Spin size='large' />
           </div>
         )}
-        <video
-          src={modalContent}
-          controls
-          style={{
-            width: '100%',
-            height: '100%',
-            maxWidth: '100%',
-            maxHeight: '100%',
-            objectFit: 'contain',
-          }}
-          onError={handleVideoError}
-          onLoadedData={handleVideoLoaded}
-          onLoadStart={() => setIsLoading(true)}
-        />
+        {mediaType === 'image' ? (
+          <img
+            src={modalContent}
+            alt={t('预览结果')}
+            style={mediaStyle}
+            onError={handleMediaError}
+            onLoad={handleMediaLoaded}
+          />
+        ) : mediaType === 'audio' ? (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+            }}
+          >
+            <audio
+              src={modalContent}
+              controls
+              style={{ width: '100%' }}
+              onError={handleMediaError}
+              onLoadedData={handleMediaLoaded}
+              onLoadStart={() => setIsLoading(true)}
+            />
+          </div>
+        ) : (
+          <video
+            src={modalContent}
+            controls
+            style={mediaStyle}
+            onError={handleMediaError}
+            onLoadedData={handleMediaLoaded}
+            onLoadStart={() => setIsLoading(true)}
+          />
+        )}
       </div>
     );
   };
@@ -162,13 +214,13 @@ const ContentModal = ({
         height: isVideo ? '70vh' : '400px',
         maxHeight: '80vh',
         overflow: 'auto',
-        padding: isVideo && videoError ? '0' : '24px',
+        padding: isVideo && mediaError ? '0' : '24px',
       }}
       width={isVideo ? '90vw' : 800}
       style={isVideo ? { maxWidth: 960 } : undefined}
     >
       {isVideo ? (
-        renderVideoContent()
+        renderMediaContent()
       ) : (
         <p style={{ whiteSpace: 'pre-line' }}>{modalContent}</p>
       )}

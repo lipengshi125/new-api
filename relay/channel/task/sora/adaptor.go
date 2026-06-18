@@ -316,6 +316,10 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 			taskResult.Reason = "task failed"
 		}
 	default:
+		// Unknown / not-started / empty status: upstream task hasn't reported a
+		// terminal state yet (e.g. polled too early). Keep polling instead of
+		// failing the task and refunding prematurely.
+		taskResult.Status = model.TaskStatusInProgress
 	}
 	if resTask.Progress > 0 && resTask.Progress < 100 {
 		taskResult.Progress = fmt.Sprintf("%d%%", resTask.Progress)

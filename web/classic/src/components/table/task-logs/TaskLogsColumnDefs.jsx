@@ -63,6 +63,57 @@ const colors = [
   'yellow',
 ];
 
+// 常见可直接在浏览器中预览的媒体文件扩展名
+const MEDIA_URL_REGEX =
+  /^https?:\/\/[^\s]+\.(png|jpe?g|gif|webp|bmp|svg|mp4|webm|mov|m4v|mp3|wav|ogg|m4a|flac|aac)(\?[^\s]*)?$/i;
+
+const isDirectMediaUrl = (url) =>
+  typeof url === 'string' && MEDIA_URL_REGEX.test(url.trim());
+
+// 从任务记录中提取可直接预览的媒体直链：
+// 优先读取 data 中带真实扩展名（.png/.jpg/.mp4/.mp3 等）的字段，
+// 这些是上游对象存储的直链；result_url 通常是带鉴权/防盗链的 API 端点，
+// 无法被浏览器的 <img>/<video>/<audio> 直接加载。
+const extractMediaUrl = (record) => {
+  if (!record) return '';
+
+  const candidates = [];
+  const collect = (obj) => {
+    if (!obj || typeof obj !== 'object') return;
+    // 常见直链字段，按优先级排列
+    candidates.push(
+      obj.video_url,
+      obj.audio_url,
+      obj.image_url,
+      obj.url,
+      obj.download_url,
+    );
+  };
+
+  const data = record.data;
+  if (Array.isArray(data)) {
+    data.forEach(collect);
+  } else if (data && typeof data === 'object') {
+    collect(data);
+  } else if (typeof data === 'string') {
+    candidates.push(data);
+  }
+
+  // 回退到顶层 result_url
+  candidates.push(record.result_url);
+
+  const direct = candidates.find(isDirectMediaUrl);
+  if (direct) return direct.trim();
+
+  // 没有命中扩展名时，退回任意 http(s) 链接（保持旧行为）
+  const fallback = candidates.find(
+    (u) => typeof u === 'string' && /^https?:\/\//.test(u.trim()),
+  );
+  return fallback ? fallback.trim() : '';
+};
+
+export { MEDIA_URL_REGEX };
+
 // Render functions
 const renderTimestamp = (timestampInSeconds) => {
   const date = new Date(timestampInSeconds * 1000); // 从秒转换为毫秒
@@ -418,23 +469,23 @@ export const getTaskLogsColumns = ({
           );
         }
 
-        // 视频预览：优先使用 result_url，兼容旧数据 fail_reason 中的 URL
-        const isVideoTask =
+        // 结果预览：优先读取 data 中带真实文件扩展名的直链（.png/.jpg/.mp4/.mp3 等），
+        // 回退到 result_url。result_url 通常是带鉴权/防盗链的 API 端点，浏览器无法直接播放。
+        const isMediaTask =
           record.action === TASK_ACTION_GENERATE ||
           record.action === TASK_ACTION_TEXT_GENERATE ||
           record.action === TASK_ACTION_FIRST_TAIL_GENERATE ||
           record.action === TASK_ACTION_REFERENCE_GENERATE ||
           record.action === TASK_ACTION_REMIX_GENERATE;
         const isSuccess = record.status === 'SUCCESS';
-        const resultUrl = record.result_url;
-        const hasResultUrl = typeof resultUrl === 'string' && /^https?:\/\//.test(resultUrl);
-        if (isSuccess && isVideoTask && hasResultUrl) {
+        const mediaUrl = extractMediaUrl(record);
+        if (isSuccess && isMediaTask && mediaUrl) {
           return (
             <a
               href='#'
               onClick={(e) => {
                 e.preventDefault();
-                openVideoModal(resultUrl);
+                openVideoModal(mediaUrl);
               }}
             >
               {t('点击预览结果')}
