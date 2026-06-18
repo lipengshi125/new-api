@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
@@ -308,6 +309,13 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 	case "completed", "succeeded":
 		taskResult.Status = model.TaskStatusSuccess
 		// Url intentionally left empty — the caller constructs the proxy URL using the public task ID
+		// 按视频时长计费：duration(秒) 向上取整作为 CompletionTokens，
+		// 配合模型补全倍率换算成实际扣费（如 1 token=1 秒，倍率按 $/秒 设置）。
+		if resTask.Data != nil && resTask.Data.Duration > 0 {
+			seconds := int(math.Ceil(resTask.Data.Duration))
+			taskResult.CompletionTokens = seconds
+			taskResult.TotalTokens = seconds
+		}
 	case "failed", "cancelled":
 		taskResult.Status = model.TaskStatusFailure
 		if resTask.Error != nil {
