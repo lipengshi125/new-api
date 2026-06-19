@@ -71,45 +71,60 @@ const isDirectMediaUrl = (url) =>
   typeof url === 'string' && MEDIA_URL_REGEX.test(url.trim());
 
 // 从任务记录中提取可直接预览的媒体直链：
-// 优先读取 data 中带真实扩展名（.png/.jpg/.mp4/.mp3 等）的字段，
-// 这些是上游对象存储的直链；result_url 通常是带鉴权/防盗链的 API 端点，
-// 无法被浏览器的 <img>/<video>/<audio> 直接加载。
+// 优先读取 data（含嵌套对象，如 data.metadata.url）中带真实扩展名
+// （.png/.jpg/.mp4/.mp3 等）的字段，这些是上游对象存储的直链；
+// result_url 通常是带鉴权/防盗链的 API 端点，无法被浏览器的
+// <img>/<video>/<audio> 直接加载。
 const extractMediaUrl = (record) => {
   if (!record) return '';
 
   const candidates = [];
-  const collect = (obj) => {
-    if (!obj || typeof obj !== 'object') return;
-    // 常见直链字段，按优先级排列
-    candidates.push(
-      obj.video_url,
-      obj.audio_url,
-      obj.image_url,
-      obj.url,
-      obj.download_url,
-    );
+  const seen = new Set();
+
+  // 深度递归收集所有候选 URL 字段，优先级字段（video_url 等）先入列
+  const collect = (node, depth = 0) => {
+    if (node == null || depth > 6) return;
+    if (typeof node === 'string') {
+      candidates.push(node);
+      return;
+    }
+    if (Array.isArray(node)) {
+      node.forEach((item) => collect(item, depth + 1));
+      return;
+    }
+    if (typeof node === 'object') {
+      if (seen.has(node)) return;
+      seen.add(node);
+      // 常见直链字段优先入列
+      candidates.push(
+        node.video_url,
+        node.audio_url,
+        node.image_url,
+        node.url,
+        node.download_url,
+      );
+      Object.values(node).forEach((v) => collect(v, depth + 1));
+    }
   };
 
-  const data = record.data;
-  if (Array.isArray(data)) {
-    data.forEach(collect);
-  } else if (data && typeof data === 'object') {
-    collect(data);
-  } else if (typeof data === 'string') {
-    candidates.push(data);
-  }
+  collect(record.data);
 
-  // 回退到顶层 result_url
-  candidates.push(record.result_url);
-
+  // 1) data 中带真实扩展名的直链（最高优先级）
   const direct = candidates.find(isDirectMediaUrl);
   if (direct) return direct.trim();
 
-  // 没有命中扩展名时，退回任意 http(s) 链接（保持旧行为）
-  const fallback = candidates.find(
+  // 2) data 中任意 http(s) 链接
+  const dataFallback = candidates.find(
     (u) => typeof u === 'string' && /^https?:\/\//.test(u.trim()),
   );
-  return fallback ? fallback.trim() : '';
+  if (dataFallback) return dataFallback.trim();
+
+  // 3) 最后才兜底到顶层 result_url（带鉴权/防盗链的 API 端点）
+  if (typeof record.result_url === 'string' && /^https?:\/\//.test(record.result_url.trim())) {
+    return record.result_url.trim();
+  }
+
+  return '';
 };
 
 export { MEDIA_URL_REGEX };
