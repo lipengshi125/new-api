@@ -424,6 +424,14 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 	taskInfo.Code = resPayload.Code
 	taskInfo.TaskID = resPayload.Data.TaskId
 	taskInfo.Reason = resPayload.Data.TaskStatusMsg
+	// 上游返回错误信封（code != 0）时，任务视为失败，触发退款，避免任务卡在非终态状态一直轮询。
+	if resPayload.Code != 0 {
+		taskInfo.Status = model.TaskStatusFailure
+		if taskInfo.Reason == "" {
+			taskInfo.Reason = lo.Ternary(resPayload.Message != "", resPayload.Message, fmt.Sprintf("upstream returned code %d", resPayload.Code))
+		}
+		return taskInfo, nil
+	}
 	//任务状态，枚举值：submitted（已提交）、processing（处理中）、succeed（成功）、failed（失败）
 	status := resPayload.Data.TaskStatus
 	switch status {
@@ -447,7 +455,11 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 	case "failed":
 		taskInfo.Status = model.TaskStatusFailure
 	default:
-		return nil, fmt.Errorf("unknown task status: %s", status)
+		// 未知/空状态视为失败，触发退款，避免任务永久卡在非终态。
+		taskInfo.Status = model.TaskStatusFailure
+		if taskInfo.Reason == "" {
+			taskInfo.Reason = fmt.Sprintf("unknown task status: %s", status)
+		}
 	}
 	return taskInfo, nil
 }
