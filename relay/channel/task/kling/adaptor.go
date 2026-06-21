@@ -89,6 +89,7 @@ type relayRequestPayload struct {
 	VideoDuration     *int           `json:"video_duration,omitempty"`
 	KeepOriginalSound *string        `json:"keep_original_sound,omitempty"`
 	ReferenceMode     string         `json:"referenceMode,omitempty"`
+	ModeType          string         `json:"modeType,omitempty"`
 	NegativePrompt    string         `json:"negative_prompt,omitempty"`
 	StaticMask        string         `json:"static_mask,omitempty"`
 	DynamicMasks      []DynamicMask  `json:"dynamic_masks,omitempty"`
@@ -325,10 +326,12 @@ func (a *TaskAdaptor) convertToRelayPayload(req *relaycommon.TaskSubmitReq, info
 		model = req.Model
 	}
 	r := relayRequestPayload{
-		Prompt: req.Prompt,
-		Model:  model,
-		Image:  req.Image,
-		Images: req.Images,
+		Prompt:   req.Prompt,
+		Model:    model,
+		Image:    req.Image,
+		Images:   req.Images,
+		Ratio:    req.Ratio,
+		ModeType: req.ModeType,
 	}
 	if req.Duration > 0 {
 		r.Duration = &req.Duration
