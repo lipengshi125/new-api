@@ -107,7 +107,17 @@ const extractMediaUrl = (record) => {
     }
   };
 
-  collect(record.data);
+  // data 可能是 JSON 字符串，需先解析再递归，否则嵌套的 url（如 data.metadata.url）
+  // 无法被读取，会错误地兜底到顶层 result_url。
+  let parsedData = record.data;
+  if (typeof parsedData === 'string') {
+    try {
+      parsedData = JSON.parse(parsedData);
+    } catch {
+      // 保持原字符串
+    }
+  }
+  collect(parsedData);
 
   // 1) data 中带真实扩展名的直链（最高优先级）
   const direct = candidates.find(isDirectMediaUrl);
