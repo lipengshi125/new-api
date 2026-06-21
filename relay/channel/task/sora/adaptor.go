@@ -52,13 +52,44 @@ type responseTask struct {
 	Seconds            string `json:"seconds,omitempty"`
 	Size               string `json:"size,omitempty"`
 	RemixedFromVideoID string `json:"remixed_from_video_id,omitempty"`
-	Data               *struct {
-		Duration float64 `json:"duration,omitempty"`
-	} `json:"data,omitempty"`
+	Data  *soraData `json:"data,omitempty"`
 	Error *struct {
 		Message string `json:"message"`
 		Code    string `json:"code"`
 	} `json:"error,omitempty"`
+}
+
+// soraData 容忍上游将 data 返回为单个对象 {"duration":5} 或数组
+// [{"duration":5}, ...]（多视频结果）。返回数组时取首个元素的时长，
+// 避免历史任务因 data 类型不匹配导致整体反序列化失败、任务卡死。
+type soraData struct {
+	Duration float64 `json:"duration,omitempty"`
+}
+
+func (d *soraData) UnmarshalJSON(b []byte) error {
+	trimmed := bytes.TrimSpace(b)
+	if len(trimmed) == 0 || string(trimmed) == "null" {
+		return nil
+	}
+	type alias soraData
+	// 数组形式：[{...}, ...] —— 取首元素
+	if trimmed[0] == '[' {
+		var arr []alias
+		if err := common.Unmarshal(trimmed, &arr); err != nil {
+			return err
+		}
+		if len(arr) > 0 {
+			*d = soraData(arr[0])
+		}
+		return nil
+	}
+	// 对象形式：{...}
+	var obj alias
+	if err := common.Unmarshal(trimmed, &obj); err != nil {
+		return err
+	}
+	*d = soraData(obj)
+	return nil
 }
 
 // ============================
