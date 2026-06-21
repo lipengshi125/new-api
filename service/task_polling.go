@@ -384,7 +384,14 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 		t := responseItems.Data
 		taskResult.TaskID = t.TaskID
 		taskResult.Status = string(t.Status)
-		taskResult.Url = t.GetResultURL()
+		// 上游 NewAPI 格式返回的 result_url 通常是它自己的代理端点
+		// （.../v1/videos/task_xxx/content，带鉴权/防盗链），浏览器无法直接播放。
+		// 优先从上游返回的原始 data（如 metadata.url）里提取真实视频直链。
+		if realURL := extractRealVideoURL(t.Data); realURL != "" {
+			taskResult.Url = realURL
+		} else {
+			taskResult.Url = t.GetResultURL()
+		}
 		taskResult.Progress = t.Progress
 		taskResult.Reason = t.FailReason
 		task.Data = t.Data
@@ -499,6 +506,92 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 	}
 
 	return nil
+}
+
+// extractRealVideoURL 从上游返回的原始 data 中提取真实的视频直链。
+// 适用于上游为 NewAPI 格式的渠道：上游的 result_url 往往是它自己的代理端点
+// （.../v1/videos/task_xxx/content），而真实可直接播放的 mp4 地址通常藏在
+// data.metadata.url（Kling 等）或常见直链字段里。优先返回带真实扩展名/可直接
+// 访问的 http(s) 直链；找不到则返回空字符串，由调用方回退到 result_url。
+func extractRealVideoURL(data []byte) string {
+	if len(data) == 0 {
+		return ""
+	}
+	var payload map[string]any
+	if err := common.Unmarshal(data, &payload); err != nil {
+		return ""
+	}
+
+	var fallback string
+	seen := make(map[any]bool)
+	var walk func(node any, depth int)
+	walk = func(node any, depth int) {
+		if node == nil || depth > 6 {
+			return
+		}
+		switch v := node.(type) {
+		case map[string]any:
+			if seen[fmt.Sprintf("%p", v)] {
+				return
+			}
+			seen[fmt.Sprintf("%p", v)] = true
+			// 常见直链字段优先
+			for _, key := range []string{"video_url", "audio_url", "image_url", "url", "download_url"} {
+				if s, ok := v[key].(string); ok {
+					s = strings.TrimSpace(s)
+					if isDirectMediaURL(s) {
+						fallback = s // 命中真实扩展名，记录但继续找更优（同样规则下首个即可）
+						return
+					}
+					if fallback == "" && strings.HasPrefix(s, "http") {
+						fallback = s
+					}
+				}
+			}
+			for _, child := range v {
+				if fallback != "" && isDirectMediaURL(fallback) {
+					return
+				}
+				walk(child, depth+1)
+			}
+		case []any:
+			for _, child := range v {
+				if fallback != "" && isDirectMediaURL(fallback) {
+					return
+				}
+				walk(child, depth+1)
+			}
+		}
+	}
+	walk(payload, 0)
+
+	if isDirectMediaURL(fallback) {
+		return fallback
+	}
+	// 没有真实扩展名时，不要返回上游代理端点（含 /v1/videos/.../content），
+	// 这类地址无法被浏览器直接播放，交由调用方回退到 result_url 处理。
+	if fallback != "" && !strings.Contains(fallback, "/v1/videos/") {
+		return fallback
+	}
+	return ""
+}
+
+// isDirectMediaURL 判断是否为带真实媒体扩展名的可直接播放直链。
+func isDirectMediaURL(u string) bool {
+	if !strings.HasPrefix(u, "http") {
+		return false
+	}
+	lower := strings.ToLower(u)
+	// 去掉 query 再判断扩展名
+	if i := strings.IndexByte(lower, '?'); i >= 0 {
+		lower = lower[:i]
+	}
+	for _, ext := range []string{".mp4", ".webm", ".mov", ".m4v", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".mp3", ".wav", ".m4a", ".flac", ".aac", ".ogg"} {
+		if strings.HasSuffix(lower, ext) {
+			return true
+		}
+	}
+	return false
 }
 
 func redactVideoResponseBody(body []byte) []byte {
