@@ -765,8 +765,30 @@ var billingUnitSecondsPrefixes = []string{
 	"kling-", "sora-", "veo-", "wan2.", "wanx2.",
 }
 
-// GetBillingUnit returns "second" if the model is known to bill per second, "" otherwise.
+// modelPriceUnitMap stores admin-configured billing units per model
+// ("second" or "request"). It takes precedence over prefix detection.
+var modelPriceUnitMap = types.NewRWMap[string, string]()
+
+func GetModelPriceUnitMap() map[string]string {
+	return modelPriceUnitMap.ReadAll()
+}
+
+func ModelPriceUnit2JSONString() string {
+	return modelPriceUnitMap.MarshalJSONString()
+}
+
+func UpdateModelPriceUnitByJSONString(jsonStr string) error {
+	return types.LoadFromJsonStringWithCallback(modelPriceUnitMap, jsonStr, InvalidateExposedDataCache)
+}
+
+// GetBillingUnit returns the billing unit for a model.
+// Admin-configured values take precedence; otherwise it falls back to
+// known per-second model name prefixes. Returns "" for per-request models.
 func GetBillingUnit(name string) string {
+	formatted := FormatMatchingModelName(name)
+	if unit, ok := modelPriceUnitMap.Get(formatted); ok {
+		return unit
+	}
 	for _, prefix := range billingUnitSecondsPrefixes {
 		if strings.HasPrefix(name, prefix) {
 			return "second"

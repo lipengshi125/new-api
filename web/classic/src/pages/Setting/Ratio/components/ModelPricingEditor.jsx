@@ -28,6 +28,7 @@ import {
   Modal,
   Radio,
   RadioGroup,
+  Select,
   Space,
   Switch,
   Table,
@@ -124,6 +125,7 @@ export default function ModelPricingEditor({
     handleOptionalFieldToggle,
     handleNumericFieldChange,
     handleBillingModeChange,
+    handleBillingUnitChange,
     handleBillingExprChange,
     handleRequestRuleExprChange,
     handleSubmit,
@@ -441,14 +443,41 @@ export default function ModelPricingEditor({
                 ) : null}
 
                 {selectedModel.billingMode === 'per-request' ? (
-                  <PriceInput
-                    label={t('固定价格')}
-                    value={selectedModel.fixedPrice}
-                    placeholder={t('输入每次调用价格')}
-                    suffix={t('$/次')}
-                    onChange={(value) => handleNumericFieldChange('fixedPrice', value)}
-                    extraText={t('适合 MJ / 任务类等按次收费模型。')}
-                  />
+                  <>
+                    <div style={{ marginBottom: 16 }}>
+                      <div className='mb-1 font-medium text-gray-700'>
+                        {t('计费单位')}
+                      </div>
+                      <Select
+                        style={{ width: '100%' }}
+                        value={selectedModel.billingUnit || 'request'}
+                        onChange={(value) => handleBillingUnitChange(value)}
+                        optionList={[
+                          { label: t('按次'), value: 'request' },
+                          { label: t('按秒'), value: 'second' },
+                        ]}
+                      />
+                      <div className='mt-1 text-xs text-gray-500'>
+                        {t(
+                          '控制「模型广场」对用户展示的计费单位：按次显示「$/次」，按秒显示「$/秒」（适合视频生成等按时长计费的模型）。',
+                        )}
+                      </div>
+                    </div>
+                    <PriceInput
+                      label={t('固定价格')}
+                      value={selectedModel.fixedPrice}
+                      placeholder={t('输入每次调用价格')}
+                      suffix={
+                        selectedModel.billingUnit === 'second'
+                          ? t('$/秒')
+                          : t('$/次')
+                      }
+                      onChange={(value) =>
+                        handleNumericFieldChange('fixedPrice', value)
+                      }
+                      extraText={t('适合 MJ / 任务类等按次收费模型。')}
+                    />
+                  </>
                 ) : selectedModel.billingMode === 'tiered_expr' ? (
                   <TieredPricingEditor
                     model={selectedModel}

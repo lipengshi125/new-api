@@ -31,6 +31,7 @@ const EMPTY_MODEL = {
   name: '',
   billingMode: 'per-token',
   fixedPrice: '',
+  billingUnit: 'request',
   inputPrice: '',
   completionPrice: '',
   lockedCompletionRatio: '',
@@ -55,6 +56,23 @@ const EMPTY_MODEL = {
 };
 
 const NUMERIC_INPUT_REGEX = /^(\d+(\.\d*)?|\.\d*)?$/;
+
+// Mirror of the backend per-second prefix detection so the dropdown defaults
+// to the effective billing unit when no explicit override is stored.
+const BILLING_UNIT_SECOND_PREFIXES = [
+  'kling-',
+  'sora-',
+  'veo-',
+  'wan2.',
+  'wanx2.',
+];
+
+const inferBillingUnit = (name) => {
+  if (!name) return 'request';
+  return BILLING_UNIT_SECOND_PREFIXES.some((prefix) => name.startsWith(prefix))
+    ? 'second'
+    : 'request';
+};
 
 export const hasValue = (value) =>
   value !== '' && value !== null && value !== undefined && value !== false;
@@ -151,6 +169,7 @@ const buildModelState = (name, sourceMaps) => {
     sourceMaps.AudioCompletionRatio[name],
   );
   const fixedPrice = toNumericString(sourceMaps.ModelPrice[name]);
+  const billingUnit = sourceMaps.ModelPriceUnit?.[name] || inferBillingUnit(name);
   const inputPrice = ratioToBasePrice(modelRatio);
   const inputPriceNumber = toNumberOrNull(inputPrice);
   const audioInputPrice =
@@ -163,6 +182,7 @@ const buildModelState = (name, sourceMaps) => {
     name,
     billingMode: hasValue(fixedPrice) ? 'per-request' : 'per-token',
     fixedPrice,
+    billingUnit,
     inputPrice,
     completionRatioLocked: completionRatioMeta.locked,
     lockedCompletionRatio: completionRatioMeta.ratio,
@@ -304,7 +324,8 @@ export const buildSummaryText = (model, t) => {
   }
 
   if (model.billingMode === 'per-request' && hasValue(model.fixedPrice)) {
-    return `${t('按次')} $${model.fixedPrice} / ${t('次')}${requestRuleSuffix}`;
+    const unitLabel = model.billingUnit === 'second' ? t('秒') : t('次');
+    return `${t('按次')} $${model.fixedPrice} / ${unitLabel}${requestRuleSuffix}`;
   }
 
   if (hasValue(model.inputPrice)) {
@@ -495,6 +516,13 @@ export const buildPreviewRows = (model, t) => {
         value: hasValue(model.fixedPrice) ? model.fixedPrice : t('空'),
       },
     ];
+    if (model.billingUnit === 'second') {
+      rows.push({
+        key: 'ModelPriceUnit',
+        label: 'ModelPriceUnit',
+        value: 'second',
+      });
+    }
     return rows;
   }
 
@@ -638,6 +666,7 @@ export function useModelPricingEditorState({
   useEffect(() => {
     const sourceMaps = {
       ModelPrice: parseOptionJSON(options.ModelPrice),
+      ModelPriceUnit: parseOptionJSON(options.ModelPriceUnit),
       ModelRatio: parseOptionJSON(options.ModelRatio),
       CompletionRatio: parseOptionJSON(options.CompletionRatio),
       CompletionRatioMeta: parseOptionJSON(options.CompletionRatioMeta),
@@ -653,6 +682,7 @@ export function useModelPricingEditorState({
     const names = new Set([
       ...candidateModelNames,
       ...Object.keys(sourceMaps.ModelPrice),
+      ...Object.keys(sourceMaps.ModelPriceUnit),
       ...Object.keys(sourceMaps.ModelRatio),
       ...Object.keys(sourceMaps.CompletionRatio),
       ...Object.keys(sourceMaps.CompletionRatioMeta),
@@ -883,6 +913,14 @@ export function useModelPricingEditorState({
     });
   };
 
+  const handleBillingUnitChange = (value) => {
+    if (!selectedModel) return;
+    upsertModel(selectedModel.name, (model) => ({
+      ...model,
+      billingUnit: value,
+    }));
+  };
+
   const handleBillingExprChange = (newExpr) => {
     if (!selectedModel) return;
     upsertModel(selectedModel.name, (model) => ({
@@ -964,6 +1002,7 @@ export function useModelPricingEditorState({
           ...model,
           billingMode: selectedModel.billingMode,
           fixedPrice: selectedModel.fixedPrice,
+          billingUnit: selectedModel.billingUnit,
           inputPrice: selectedModel.inputPrice,
           completionPrice: selectedModel.completionPrice,
           cachePrice: selectedModel.cachePrice,
@@ -1025,6 +1064,7 @@ export function useModelPricingEditorState({
     try {
       const output = {
         ModelPrice: {},
+        ModelPriceUnit: {},
         ModelRatio: {},
         CompletionRatio: {},
         CacheRatio: {},
@@ -1066,6 +1106,13 @@ export function useModelPricingEditorState({
           if (model.billingMode !== 'tiered_expr') {
             throw e;
           }
+        }
+
+        // Persist billing unit only for per-request models that explicitly
+        // bill per second; per-request (default) models are omitted so the
+        // map stays small and prefix detection still applies as fallback.
+        if (model.billingMode === 'per-request' && model.billingUnit === 'second') {
+          output.ModelPriceUnit[model.name] = 'second';
         }
       }
 
@@ -1123,6 +1170,7 @@ export function useModelPricingEditorState({
     handleOptionalFieldToggle,
     handleNumericFieldChange,
     handleBillingModeChange,
+    handleBillingUnitChange,
     handleBillingExprChange,
     handleRequestRuleExprChange,
     handleSubmit,
