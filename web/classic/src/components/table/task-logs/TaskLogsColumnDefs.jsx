@@ -20,8 +20,6 @@ For commercial licensing, please contact support@quantumnous.com
 import React from 'react';
 import { Progress, Tag, Tooltip, Typography } from '@douyinfe/semi-ui';
 import {
-  Music,
-  FileText,
   HelpCircle,
   CheckCircle,
   Pause,
@@ -30,9 +28,6 @@ import {
   XCircle,
   Loader,
   List,
-  Hash,
-  Video,
-  Sparkles,
 } from 'lucide-react';
 import {
   TASK_ACTION_FIRST_TAIL_GENERATE,
@@ -41,8 +36,7 @@ import {
   TASK_ACTION_TEXT_GENERATE,
   TASK_ACTION_REMIX_GENERATE,
 } from '../../../constants/common.constant';
-import { CHANNEL_OPTIONS } from '../../../constants/channel.constants';
-import { stringToColor } from '../../../helpers/render';
+import { stringToColor, renderModelTag } from '../../../helpers/render';
 import { Avatar, Space } from '@douyinfe/semi-ui';
 
 const colors = [
@@ -165,86 +159,6 @@ function renderDuration(submit_time, finishTime) {
     </Tag>
   );
 }
-
-const renderType = (type, t) => {
-  switch (type) {
-    case 'MUSIC':
-      return (
-        <Tag color='grey' shape='circle' prefixIcon={<Music size={14} />}>
-          {t('生成音乐')}
-        </Tag>
-      );
-    case 'LYRICS':
-      return (
-        <Tag color='pink' shape='circle' prefixIcon={<FileText size={14} />}>
-          {t('生成歌词')}
-        </Tag>
-      );
-    case TASK_ACTION_GENERATE:
-      return (
-        <Tag color='blue' shape='circle' prefixIcon={<Sparkles size={14} />}>
-          {t('图生视频')}
-        </Tag>
-      );
-    case TASK_ACTION_TEXT_GENERATE:
-      return (
-        <Tag color='blue' shape='circle' prefixIcon={<Sparkles size={14} />}>
-          {t('文生视频')}
-        </Tag>
-      );
-    case TASK_ACTION_FIRST_TAIL_GENERATE:
-      return (
-        <Tag color='blue' shape='circle' prefixIcon={<Sparkles size={14} />}>
-          {t('首尾生视频')}
-        </Tag>
-      );
-    case TASK_ACTION_REFERENCE_GENERATE:
-      return (
-        <Tag color='blue' shape='circle' prefixIcon={<Sparkles size={14} />}>
-          {t('参照生视频')}
-        </Tag>
-      );
-    case TASK_ACTION_REMIX_GENERATE:
-      return (
-        <Tag color='blue' shape='circle' prefixIcon={<Sparkles size={14} />}>
-          {t('视频Remix')}
-        </Tag>
-      );
-    default:
-      return (
-        <Tag color='white' shape='circle' prefixIcon={<HelpCircle size={14} />}>
-          {t('未知')}
-        </Tag>
-      );
-  }
-};
-
-const renderPlatform = (platform, t) => {
-  let option = CHANNEL_OPTIONS.find(
-    (opt) => String(opt.value) === String(platform),
-  );
-  if (option) {
-    return (
-      <Tag color={option.color} shape='circle'>
-        {option.label}
-      </Tag>
-    );
-  }
-  switch (platform) {
-    case 'suno':
-      return (
-        <Tag color='green' shape='circle'>
-          Suno
-        </Tag>
-      );
-    default:
-      return (
-        <Tag color='white' shape='circle'>
-          {t('未知')}
-        </Tag>
-      );
-  }
-};
 
 const renderStatus = (type, t) => {
   switch (type) {
@@ -392,18 +306,44 @@ export const getTaskLogsColumns = ({
     },
     {
       key: COLUMN_KEYS.PLATFORM,
-      title: t('平台'),
-      dataIndex: 'platform',
+      title: t('令牌'),
+      dataIndex: 'token_name',
       render: (text, record, index) => {
-        return <div>{renderPlatform(text, t)}</div>;
+        if (!text) {
+          return <></>;
+        }
+        return (
+          <div>
+            <Tag
+              color='grey'
+              shape='circle'
+              onClick={() => {
+                copyText(text);
+              }}
+            >
+              {text}
+            </Tag>
+          </div>
+        );
       },
     },
     {
       key: COLUMN_KEYS.TYPE,
-      title: t('类型'),
+      title: t('模型'),
       dataIndex: 'action',
       render: (text, record, index) => {
-        return <div>{renderType(text, t)}</div>;
+        const modelName =
+          record?.properties?.origin_model_name ||
+          record?.properties?.upstream_model_name ||
+          '';
+        if (!modelName) {
+          return <></>;
+        }
+        return renderModelTag(modelName, {
+          onClick: () => {
+            copyText(modelName);
+          },
+        });
       },
     },
     {
