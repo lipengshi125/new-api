@@ -22,7 +22,7 @@ services:
       - ./data:/data
       - ./logs:/app/logs
     environment:
-      - SQL_DSN=postgresql://root:123456@postgres:5432/new-api
+      - SQL_DSN=root:123456@tcp(mysql:3306)/newapi
       - REDIS_CONN_STRING=redis://:123456@redis:6379
       - TZ=Asia/Shanghai
       - GLOBAL_API_RATE_LIMIT_ENABLE=false
@@ -32,7 +32,7 @@ services:
       - NODE_NAME=new-api-local
     depends_on:
       - redis
-      - postgres
+      - mysql
     networks:
       - new-api-local-network
     healthcheck:
@@ -49,21 +49,23 @@ services:
     networks:
       - new-api-local-network
 
-  postgres:
-    image: postgres:18-alpine
-    container_name: postgres-local
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-local
     restart: unless-stopped
     environment:
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: 123456
-      POSTGRES_DB: new-api
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: newapi
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     volumes:
-      - pg_data_local:/var/lib/postgresql
+      - mysql_data_local:/var/lib/mysql
+    ports:
+      - "3307:3306"
     networks:
       - new-api-local-network
 
 volumes:
-  pg_data_local:
+  mysql_data_local:
 
 networks:
   new-api-local-network:
