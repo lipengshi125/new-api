@@ -61,6 +61,7 @@ import {
   type ModelRow,
 } from './model-pricing-snapshots'
 import { buildModelRatioColumns } from './model-ratio-table-columns'
+import { inferBillingUnit, type BillingUnit } from './model-pricing-core'
 
 type ModelRatioVisualEditorProps = {
   savedModelPrice: string
@@ -83,6 +84,8 @@ type ModelRatioVisualEditorProps = {
   audioCompletionRatio: string
   billingMode: string
   billingExpr: string
+  savedModelPriceUnit: string
+  modelPriceUnit: string
   onChange: (field: string, value: string) => void
   onSave: () => void | Promise<void>
   isSaving: boolean
@@ -119,6 +122,8 @@ const ModelRatioVisualEditorComponent = forwardRef<
     audioCompletionRatio,
     billingMode,
     billingExpr,
+    savedModelPriceUnit,
+    modelPriceUnit,
     onChange,
     onSave,
     isSaving,
@@ -273,6 +278,15 @@ const ModelRatioVisualEditorComponent = forwardRef<
   const handleEdit = useCallback(
     (model: ModelRow) => {
       const editableModel = model.draft ?? model.saved ?? model
+      const priceUnitMap = safeJsonParse<Record<string, string>>(
+        modelPriceUnit || savedModelPriceUnit,
+        { fallback: {}, silent: true }
+      )
+      const savedUnit = priceUnitMap[editableModel.name]
+      const billingUnit: BillingUnit =
+        savedUnit === 'second' || savedUnit === 'request'
+          ? savedUnit
+          : inferBillingUnit(editableModel.name)
       setEditData({
         name: editableModel.name,
         price: editableModel.price,
@@ -291,11 +305,12 @@ const ModelRatioVisualEditorComponent = forwardRef<
               : 'per-token',
         billingExpr: editableModel.billingExpr,
         requestRuleExpr: editableModel.requestRuleExpr,
+        billingUnit,
       })
       setEditorOpen(true)
       if (isMobile) setSheetOpen(true)
     },
-    [isMobile]
+    [isMobile, modelPriceUnit, savedModelPriceUnit]
   )
 
   const handleAdd = useCallback(() => {
@@ -361,6 +376,10 @@ const ModelRatioVisualEditorComponent = forwardRef<
         billingExpr,
         { fallback: {}, silent: true }
       )
+      const priceUnitMap = safeJsonParse<Record<string, string>>(
+        modelPriceUnit,
+        { fallback: {}, silent: true }
+      )
 
       delete priceMap[name]
       delete ratioMap[name]
@@ -372,6 +391,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       delete audioCompletionMap[name]
       delete billingModeMap[name]
       delete billingExprMap[name]
+      delete priceUnitMap[name]
 
       onChange('ModelPrice', JSON.stringify(priceMap, null, 2))
       onChange('ModelRatio', JSON.stringify(ratioMap, null, 2))
@@ -392,6 +412,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
         'billing_setting.billing_expr',
         JSON.stringify(billingExprMap, null, 2)
       )
+      onChange('ModelPriceUnit', JSON.stringify(priceUnitMap, null, 2))
     },
     [
       modelPrice,
@@ -404,6 +425,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       audioCompletionRatio,
       billingMode,
       billingExpr,
+      modelPriceUnit,
       onChange,
     ]
   )
@@ -483,6 +505,10 @@ const ModelRatioVisualEditorComponent = forwardRef<
         billingExpr,
         { fallback: {}, silent: true }
       )
+      const priceUnitMap = safeJsonParse<Record<string, string>>(
+        modelPriceUnit,
+        { fallback: {}, silent: true }
+      )
 
       const setIfPresent = (
         target: Record<string, number>,
@@ -505,6 +531,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
         delete audioCompletionMap[name]
         delete billingModeMap[name]
         delete billingExprMap[name]
+        delete priceUnitMap[name]
 
         if (data.billingMode === 'tiered_expr') {
           const combined = combineBillingExpr(
@@ -529,6 +556,10 @@ const ModelRatioVisualEditorComponent = forwardRef<
           setIfPresent(audioCompletionMap, name, data.audioCompletionRatio)
         } else if (data.price && data.price !== '') {
           setIfPresent(priceMap, name, data.price)
+          // Persist the explicit billing unit (request OR second) so the
+          // admin's choice always overrides backend prefix detection.
+          priceUnitMap[name] =
+            data.billingUnit === 'second' ? 'second' : 'request'
         } else {
           setIfPresent(ratioMap, name, data.ratio)
           setIfPresent(cacheMap, name, data.cacheRatio)
@@ -559,6 +590,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
         'billing_setting.billing_expr',
         JSON.stringify(billingExprMap, null, 2)
       )
+      onChange('ModelPriceUnit', JSON.stringify(priceUnitMap, null, 2))
     },
     [
       modelPrice,
@@ -571,6 +603,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       audioCompletionRatio,
       billingMode,
       billingExpr,
+      modelPriceUnit,
       onChange,
     ]
   )

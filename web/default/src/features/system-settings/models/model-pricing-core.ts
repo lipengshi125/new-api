@@ -39,6 +39,28 @@ export type ModelPricingFormValues = z.infer<
 
 export type PricingMode = 'per-token' | 'per-request' | 'tiered_expr'
 
+// BillingUnit controls whether a per-request model is charged per call
+// ('request') or per second of generation ('second', e.g. video models).
+export type BillingUnit = 'request' | 'second'
+
+// Model name prefixes that default to per-second billing, mirroring the
+// backend's billingUnitSecondsPrefixes in setting/ratio_setting. Used only as
+// a display fallback when the admin has not explicitly chosen a unit.
+export const BILLING_UNIT_SECOND_PREFIXES = [
+  'kling-',
+  'sora-',
+  'veo-',
+  'wan2.',
+  'wanx2.',
+]
+
+export function inferBillingUnit(name: string): BillingUnit {
+  if (!name) return 'request'
+  return BILLING_UNIT_SECOND_PREFIXES.some((prefix) => name.startsWith(prefix))
+    ? 'second'
+    : 'request'
+}
+
 export type LaneKey =
   | 'completion'
   | 'cache'
@@ -60,6 +82,7 @@ export type ModelRatioData = {
   billingMode?: PricingMode
   billingExpr?: string
   requestRuleExpr?: string
+  billingUnit?: BillingUnit
 }
 
 export type PreviewRow = {

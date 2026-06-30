@@ -54,6 +54,7 @@ type ModelFormValues = {
   ExposeRatioEnabled: boolean
   BillingMode: string
   BillingExpr: string
+  ModelPriceUnit: string
 }
 
 type ModelRatioFormProps = {
@@ -254,6 +255,8 @@ export const ModelRatioForm = memo(function ModelRatioForm({
               audioCompletionRatio={form.watch('AudioCompletionRatio')}
               billingMode={form.watch('BillingMode')}
               billingExpr={form.watch('BillingExpr')}
+              savedModelPriceUnit={savedValues.ModelPriceUnit}
+              modelPriceUnit={form.watch('ModelPriceUnit')}
               onSave={handleSave}
               isSaving={isSaving}
               onChange={(field, value) => {

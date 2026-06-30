@@ -68,15 +68,21 @@ import {
   createInitialLaneState,
   createModelPricingSchema,
   hasValue,
+  inferBillingUnit,
   laneConfigs,
   numericDraftRegex,
   ratioFieldByLane,
   toNumberOrNull,
+  type BillingUnit,
   type LaneKey,
   type ModelPricingFormValues,
   type ModelRatioData,
   type PricingMode,
 } from './model-pricing-core'
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from '@/components/ui/native-select'
 import { PriceInput, PriceLane } from './model-pricing-inputs'
 import { formatPricingNumber } from './pricing-format'
 import { TieredPricingEditor } from './tiered-pricing-editor'
@@ -153,6 +159,7 @@ export const ModelPricingEditorPanel = forwardRef<
   })
   const [billingExpr, setBillingExpr] = useState('')
   const [requestRuleExpr, setRequestRuleExpr] = useState('')
+  const [billingUnit, setBillingUnit] = useState<BillingUnit>('request')
   const isEditMode = !!editData
 
   const form = useForm<ModelPricingFormValues>({
@@ -194,6 +201,7 @@ export const ModelPricingEditorPanel = forwardRef<
       )
       setBillingExpr(editData.billingExpr || '')
       setRequestRuleExpr(editData.requestRuleExpr || '')
+      setBillingUnit(editData.billingUnit || inferBillingUnit(editData.name))
     } else {
       form.reset({
         name: '',
@@ -209,6 +217,7 @@ export const ModelPricingEditorPanel = forwardRef<
       setPricingMode('per-token')
       setBillingExpr('')
       setRequestRuleExpr('')
+      setBillingUnit('request')
     }
 
     setPromptPrice(nextLaneState.promptPrice)
@@ -454,9 +463,13 @@ export const ModelPricingEditorPanel = forwardRef<
         data.requestRuleExpr = requestRuleExpr
       }
 
+      if (pricingMode === 'per-request') {
+        data.billingUnit = billingUnit
+      }
+
       return data
     },
-    [billingExpr, pricingMode, requestRuleExpr]
+    [billingExpr, billingUnit, pricingMode, requestRuleExpr]
   )
 
   useImperativeHandle(
@@ -604,23 +617,39 @@ export const ModelPricingEditorPanel = forwardRef<
                             <Field>
                               <FieldLabel>{t('Fixed price')}</FieldLabel>
                               <FormControl>
-                                <InputGroup>
-                                  <InputGroupAddon>$</InputGroupAddon>
-                                  <InputGroupInput
-                                    inputMode='decimal'
-                                    placeholder='0.01'
-                                    {...field}
-                                    onChange={(event) => {
-                                      const value = event.target.value
-                                      if (numericDraftRegex.test(value)) {
-                                        field.onChange(value)
-                                      }
-                                    }}
-                                  />
-                                  <InputGroupAddon align='inline-end'>
-                                    {t('per request')}
-                                  </InputGroupAddon>
-                                </InputGroup>
+                                <div className='flex items-center gap-2'>
+                                  <InputGroup className='flex-1'>
+                                    <InputGroupAddon>$</InputGroupAddon>
+                                    <InputGroupInput
+                                      inputMode='decimal'
+                                      placeholder='0.01'
+                                      {...field}
+                                      onChange={(event) => {
+                                        const value = event.target.value
+                                        if (numericDraftRegex.test(value)) {
+                                          field.onChange(value)
+                                        }
+                                      }}
+                                    />
+                                  </InputGroup>
+                                  <NativeSelect
+                                    value={billingUnit}
+                                    onChange={(event) =>
+                                      setBillingUnit(
+                                        event.target.value as BillingUnit
+                                      )
+                                    }
+                                    aria-label={t('Billing unit')}
+                                    className='shrink-0'
+                                  >
+                                    <NativeSelectOption value='request'>
+                                      {t('per request')}
+                                    </NativeSelectOption>
+                                    <NativeSelectOption value='second'>
+                                      {t('per second')}
+                                    </NativeSelectOption>
+                                  </NativeSelect>
+                                </div>
                               </FormControl>
                               <FieldDescription>
                                 {t(

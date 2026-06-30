@@ -108,6 +108,7 @@ const createModelSchema = (t: Translate) =>
     ExposeRatioEnabled: z.boolean(),
     BillingMode: createJsonStringField(t),
     BillingExpr: createJsonStringField(t),
+    ModelPriceUnit: createJsonStringField(t),
   })
 
 const createGroupSchema = (t: Translate) =>
@@ -180,6 +181,7 @@ export function RatioSettingsCard({
     ExposeRatioEnabled: modelDefaults.ExposeRatioEnabled,
     BillingMode: normalizeJsonString(modelDefaults.BillingMode),
     BillingExpr: normalizeJsonString(modelDefaults.BillingExpr),
+    ModelPriceUnit: normalizeJsonString(modelDefaults.ModelPriceUnit),
   })
   const [savedModelValues, setSavedModelValues] = useState(
     modelNormalizedDefaults.current
@@ -216,6 +218,7 @@ export function RatioSettingsCard({
       ),
       BillingMode: formatJsonForTextarea(modelDefaults.BillingMode),
       BillingExpr: formatJsonForTextarea(modelDefaults.BillingExpr),
+      ModelPriceUnit: formatJsonForTextarea(modelDefaults.ModelPriceUnit),
     },
   })
 
@@ -250,6 +253,7 @@ export function RatioSettingsCard({
       ExposeRatioEnabled: modelDefaults.ExposeRatioEnabled,
       BillingMode: normalizeJsonString(modelDefaults.BillingMode),
       BillingExpr: normalizeJsonString(modelDefaults.BillingExpr),
+      ModelPriceUnit: normalizeJsonString(modelDefaults.ModelPriceUnit),
     }
     setSavedModelValues(modelNormalizedDefaults.current)
 
@@ -267,6 +271,7 @@ export function RatioSettingsCard({
       ),
       BillingMode: formatJsonForTextarea(modelDefaults.BillingMode),
       BillingExpr: formatJsonForTextarea(modelDefaults.BillingExpr),
+      ModelPriceUnit: formatJsonForTextarea(modelDefaults.ModelPriceUnit),
     })
   }, [modelDefaults, modelForm])
 
@@ -310,6 +315,7 @@ export function RatioSettingsCard({
         ExposeRatioEnabled: values.ExposeRatioEnabled,
         BillingMode: normalizeJsonString(values.BillingMode),
         BillingExpr: normalizeJsonString(values.BillingExpr),
+        ModelPriceUnit: normalizeJsonString(values.ModelPriceUnit),
       }
 
       const apiKeyMap: Record<string, string> = {

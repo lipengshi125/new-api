@@ -1108,11 +1108,12 @@ export function useModelPricingEditorState({
           }
         }
 
-        // Persist billing unit only for per-request models that explicitly
-        // bill per second; per-request (default) models are omitted so the
-        // map stays small and prefix detection still applies as fallback.
-        if (model.billingMode === 'per-request' && model.billingUnit === 'second') {
-          output.ModelPriceUnit[model.name] = 'second';
+        // Persist the explicit billing unit for per-request models so the
+        // admin's choice always wins over backend prefix detection (e.g. a
+        // kling-* model forced back to "request" stays "request" on reload).
+        if (model.billingMode === 'per-request') {
+          output.ModelPriceUnit[model.name] =
+            model.billingUnit === 'second' ? 'second' : 'request';
         }
       }
 

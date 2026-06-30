@@ -23,12 +23,12 @@ import {
   Button,
   Card,
   Checkbox,
+  Dropdown,
   Empty,
   Input,
   Modal,
   Radio,
   RadioGroup,
-  Select,
   Space,
   Switch,
   Table,
@@ -36,6 +36,7 @@ import {
   Typography,
 } from '@douyinfe/semi-ui';
 import {
+  IconChevronDown,
   IconDelete,
   IconPlus,
   IconSave,
@@ -443,41 +444,50 @@ export default function ModelPricingEditor({
                 ) : null}
 
                 {selectedModel.billingMode === 'per-request' ? (
-                  <>
-                    <div style={{ marginBottom: 16 }}>
-                      <div className='mb-1 font-medium text-gray-700'>
-                        {t('计费单位')}
-                      </div>
-                      <Select
-                        style={{ width: '100%' }}
-                        value={selectedModel.billingUnit || 'request'}
-                        onChange={(value) => handleBillingUnitChange(value)}
-                        optionList={[
-                          { label: t('按次'), value: 'request' },
-                          { label: t('按秒'), value: 'second' },
-                        ]}
-                      />
-                      <div className='mt-1 text-xs text-gray-500'>
-                        {t(
-                          '控制「模型广场」对用户展示的计费单位：按次显示「$/次」，按秒显示「$/秒」（适合视频生成等按时长计费的模型）。',
-                        )}
-                      </div>
-                    </div>
-                    <PriceInput
-                      label={t('固定价格')}
-                      value={selectedModel.fixedPrice}
-                      placeholder={t('输入每次调用价格')}
-                      suffix={
-                        selectedModel.billingUnit === 'second'
-                          ? t('$/秒')
-                          : t('$/次')
-                      }
-                      onChange={(value) =>
-                        handleNumericFieldChange('fixedPrice', value)
-                      }
-                      extraText={t('适合 MJ / 任务类等按次收费模型。')}
-                    />
-                  </>
+                  <PriceInput
+                    label={t('固定价格')}
+                    value={selectedModel.fixedPrice}
+                    placeholder={t('输入每次调用价格')}
+                    suffix={
+                      <Dropdown
+                        trigger='click'
+                        position='bottomRight'
+                        render={
+                          <Dropdown.Menu>
+                            <Dropdown.Item
+                              active={
+                                (selectedModel.billingUnit || 'request') ===
+                                'request'
+                              }
+                              onClick={() => handleBillingUnitChange('request')}
+                            >
+                              {t('次')}
+                            </Dropdown.Item>
+                            <Dropdown.Item
+                              active={selectedModel.billingUnit === 'second'}
+                              onClick={() => handleBillingUnitChange('second')}
+                            >
+                              {t('秒')}
+                            </Dropdown.Item>
+                          </Dropdown.Menu>
+                        }
+                      >
+                        <span
+                          className='cursor-pointer select-none px-1 text-gray-600 hover:text-blue-500'
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}
+                        >
+                          {selectedModel.billingUnit === 'second'
+                            ? t('$/秒')
+                            : t('$/次')}
+                          <IconChevronDown size='small' />
+                        </span>
+                      </Dropdown>
+                    }
+                    onChange={(value) =>
+                      handleNumericFieldChange('fixedPrice', value)
+                    }
+                    extraText={t('适合 MJ / 任务类等按次收费模型。')}
+                  />
                 ) : selectedModel.billingMode === 'tiered_expr' ? (
                   <TieredPricingEditor
                     model={selectedModel}
