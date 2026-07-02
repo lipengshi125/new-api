@@ -380,6 +380,37 @@ func (user *User) TransferAffQuotaToQuota(quota int) error {
 	return tx.Commit().Error
 }
 
+// BeforeCreate assigns a random 6-digit ID (100000-199999) to newly created
+// users so IDs are not sequentially guessable. The root account, records with
+// an explicitly set ID (e.g. migrations/tests), and existing users are left
+// untouched — this only affects rows created with Id == 0.
+func (user *User) BeforeCreate(tx *gorm.DB) error {
+	if user.Id != 0 || user.Role == common.RoleRootUser {
+		return nil
+	}
+	const (
+		idMin    = 100000 // smallest 6-digit id starting with 1
+		idSpan   = 100000  // yields 100000-199999 inclusive
+		maxTries = 30
+	)
+	// Use a fresh statement on the same transaction so the count query does not
+	// clobber the in-flight create statement but still sees uncommitted rows.
+	session := tx.Session(&gorm.Session{NewDB: true})
+	for i := 0; i < maxTries; i++ {
+		candidate := idMin + common.GetRandomInt(idSpan)
+		var count int64
+		// Unscoped so soft-deleted rows (which still occupy the primary key) count.
+		if err := session.Unscoped().Model(&User{}).Where("id = ?", candidate).Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			user.Id = candidate
+			return nil
+		}
+	}
+	return errors.New("failed to allocate a unique user id")
+}
+
 func (user *User) Insert(inviterId int) error {
 	var err error
 	if user.Password != "" {
