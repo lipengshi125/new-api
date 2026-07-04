@@ -826,7 +826,18 @@ export const getLogsColumns = ({
             </Tooltip>
           );
         }
-        return <>{renderQuota(text, 6)}</>;
+        return (
+          <span
+            style={
+              record.type === 6
+                ? { color: 'var(--semi-color-success)' }
+                : undefined
+            }
+          >
+            {record.type === 6 ? '-' : ''}
+            {renderQuota(text, 6)}
+          </span>
+        );
       },
     },
     {

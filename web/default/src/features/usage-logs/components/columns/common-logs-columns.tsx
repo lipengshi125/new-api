@@ -733,10 +733,18 @@ export function useCommonLogsColumns(isAdmin: boolean): ColumnDef<UsageLog>[] {
 
         const quotaStr = formatLogQuota(quota)
         const quotaDisplay = splitQuotaDisplay(quotaStr)
+        // 退款（type 6）显示为负数并标绿，避免与消费混淆、被统计重复累加
+        const isRefund = log.type === 6
 
         return (
           <div className='flex flex-col gap-0.5'>
-            <span className='border-border/80 bg-muted/60 inline-flex h-6 w-fit items-center rounded-md border px-2 [font-family:var(--font-body)] text-sm leading-none font-semibold tabular-nums'>
+            <span
+              className={
+                'border-border/80 bg-muted/60 inline-flex h-6 w-fit items-center rounded-md border px-2 [font-family:var(--font-body)] text-sm leading-none font-semibold tabular-nums' +
+                (isRefund ? ' text-emerald-600 dark:text-emerald-400' : '')
+              }
+            >
+              {isRefund && <span className='mr-0.5'>-</span>}
               {quotaDisplay.prefix && (
                 <span className='mr-1'>{quotaDisplay.prefix}</span>
               )}
