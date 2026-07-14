@@ -16,18 +16,23 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-/* eslint-disable react-refresh/only-export-components */
-import { useState, useMemo } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Music } from 'lucide-react'
+/* eslint-disable react-refresh/only-export-components */
+import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+
+import { StatusBadge } from '@/components/status-badge'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { getUserAvatarFallback, getUserAvatarStyle } from '@/lib/avatar'
 import { formatTimestampToDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { StatusBadge } from '@/components/status-badge'
 import { TASK_PLATFORM_MAPPINGS, TASK_STATUS } from '../../constants'
-import { taskPlatformMapper, taskStatusMapper } from '../../lib/mappers'
+import {
+  taskPlatformMapper,
+  taskActionMapper,
+  taskStatusMapper,
+} from '../../lib/mappers'
 import type { TaskLog } from '../../types'
 import {
   AudioPreviewDialog,
@@ -294,17 +299,24 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
       accessorKey: 'task_id',
       header: t('Task ID'),
       cell: ({ row }) => {
+        const log = row.original
         const taskId = row.getValue('task_id') as string
         if (!taskId) {
           return <span className='text-muted-foreground/60 text-xs'>-</span>
         }
         return (
-          <StatusBadge
-            label={taskId}
-            autoColor={taskId}
-            size='sm'
-            className='border-border/60 bg-muted/30 max-w-[170px] truncate rounded-md border px-1.5 py-0.5 font-mono'
-          />
+          <div className='flex max-w-[170px] flex-col gap-0.5'>
+            <StatusBadge
+              label={taskId}
+              copyText={taskId}
+              variant='neutral'
+              size='sm'
+              className='border-border/60 bg-muted/30 !text-foreground max-w-full truncate rounded-md border px-1.5 py-0.5 font-mono'
+            />
+            <span className='text-muted-foreground/60 truncate text-[11px]'>
+              {t(taskActionMapper.getLabel(log.action))}
+            </span>
+          </div>
         )
       },
       meta: { mobileTitle: true },
