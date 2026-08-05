@@ -103,6 +103,7 @@ export default function ModelPricingEditor({
   const isMobile = useIsMobile();
   const [addVisible, setAddVisible] = useState(false);
   const [batchVisible, setBatchVisible] = useState(false);
+  const [batchDeleteVisible, setBatchDeleteVisible] = useState(false);
   const [newModelName, setNewModelName] = useState('');
 
   const {
@@ -132,6 +133,7 @@ export default function ModelPricingEditor({
     handleSubmit,
     addModel,
     deleteModel,
+    deleteModels,
     applySelectedModelPricing,
   } = useModelPricingEditorState({
     options,
@@ -283,6 +285,18 @@ export default function ModelPricingEditor({
             {t('批量应用当前模型价格')}
             {selectedModelNames.length > 0 ? ` (${selectedModelNames.length})` : ''}
           </Button>
+          {allowDeleteModel ? (
+            <Button
+              type='danger'
+              icon={<IconDelete />}
+              disabled={selectedModelNames.length === 0}
+              onClick={() => setBatchDeleteVisible(true)}
+              style={isMobile ? { width: '100%' } : undefined}
+            >
+              {t('批量删除')}
+              {selectedModelNames.length > 0 ? ` (${selectedModelNames.length})` : ''}
+            </Button>
+          ) : null}
           <Input
             prefix={<IconSearch />}
             placeholder={t('搜索模型名称')}
@@ -815,6 +829,28 @@ export default function ModelPricingEditor({
           </div>
         ) : null}
       </Modal>
+
+      {allowDeleteModel ? (
+        <Modal
+          title={t('批量删除')}
+          type='warning'
+          visible={batchDeleteVisible}
+          onCancel={() => setBatchDeleteVisible(false)}
+          okType='danger'
+          okText={t('删除')}
+          onOk={() => {
+            if (deleteModels(selectedModelNames)) {
+              setBatchDeleteVisible(false);
+            }
+          }}
+        >
+          <div className='text-sm text-gray-600'>
+            {t('确认删除已勾选的 {{count}} 个模型？此操作会移除它们的价格配置，需要点击“应用更改”后才会真正保存。', {
+              count: selectedModelNames.length,
+            })}
+          </div>
+        </Modal>
+      ) : null}
     </>
   );
 }

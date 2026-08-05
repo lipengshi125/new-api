@@ -980,6 +980,29 @@ export function useModelPricingEditorState({
     }
   };
 
+  const deleteModels = (names) => {
+    const removeSet = new Set(names);
+    if (removeSet.size === 0) {
+      showError(t('请先勾选需要删除的模型'));
+      return false;
+    }
+    const nextModels = models.filter((model) => !removeSet.has(model.name));
+    setModels(nextModels);
+    setOptionalFieldToggles((prev) => {
+      const next = { ...prev };
+      removeSet.forEach((name) => delete next[name]);
+      return next;
+    });
+    setSelectedModelNames((previous) =>
+      previous.filter((item) => !removeSet.has(item)),
+    );
+    if (removeSet.has(selectedModelName)) {
+      setSelectedModelName(nextModels[0]?.name || '');
+    }
+    showSuccess(t('已删除 {{count}} 个模型', { count: removeSet.size }));
+    return true;
+  };
+
   const applySelectedModelPricing = () => {
     if (!selectedModel) {
       showError(t('请先选择一个作为模板的模型'));
@@ -1177,6 +1200,7 @@ export function useModelPricingEditorState({
     handleSubmit,
     addModel,
     deleteModel,
+    deleteModels,
     applySelectedModelPricing,
   };
 }
