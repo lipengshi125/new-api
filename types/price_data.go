@@ -42,6 +42,13 @@ func (p *PriceData) AddOtherRatio(key string, ratio float64) {
 	p.otherRatios[key] = ratio
 }
 
+func (p *PriceData) RemoveOtherRatio(key string) {
+	if p.otherRatios == nil {
+		return
+	}
+	delete(p.otherRatios, key)
+}
+
 func (p *PriceData) ReplaceOtherRatios(ratios map[string]float64) bool {
 	p.otherRatios = nil
 	for key, ratio := range ratios {

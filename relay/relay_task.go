@@ -19,6 +19,7 @@ import (
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/gin-gonic/gin"
 )
 
@@ -192,6 +193,13 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 		for k, v := range estimatedRatios {
 			info.PriceData.AddOtherRatio(k, v)
 		}
+	}
+
+	// 5.5 时长倍率仅在按秒计费时生效：按次计费的模型不应乘以 seconds/duration，
+	//     否则会按请求参数里的秒数放大扣费（例如 seconds:15 使按次价格被 x15）。
+	if ratio_setting.GetBillingUnit(modelName) != "second" {
+		info.PriceData.RemoveOtherRatio("seconds")
+		info.PriceData.RemoveOtherRatio("duration")
 	}
 
 	// 6. 将 OtherRatios 应用到基础额度（饱和转换，防止溢出成负数）
