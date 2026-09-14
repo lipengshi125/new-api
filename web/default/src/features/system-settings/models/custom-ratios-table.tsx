@@ -70,6 +70,23 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
     return groupIndex % 2 === 0 ? 'bg-muted/30' : ''
   }
 
+  const handleAddRow = useCallback(() => {
+    const newRow: FlatRatioRow = {
+      id: `new-${Date.now()}`,
+      paramName: '',
+      paramValue: '',
+      ratio: 1.0,
+    }
+    handleRowsChange([...rows, newRow])
+  }, [rows, handleRowsChange])
+
+  const handleDeleteRow = useCallback(
+    (id: string) => {
+      handleRowsChange(rows.filter((row) => row.id !== id))
+    },
+    [rows, handleRowsChange]
+  )
+
   return (
     <div className='space-y-4'>
       <div>
@@ -81,6 +98,19 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
             'Configure request parameter multipliers. Multiple multipliers will be multiplied together.'
           )}
         </p>
+      </div>
+
+      {/* 工具栏 */}
+      <div className='flex justify-end'>
+        <Button
+          type='button'
+          variant='outline'
+          size='sm'
+          onClick={handleAddRow}
+        >
+          <Plus className='mr-2 size-4' />
+          {t('Add Parameter')}
+        </Button>
       </div>
 
       <div className='rounded-lg border'>
@@ -133,9 +163,7 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
                     variant='ghost'
                     size='sm'
                     className='size-8 p-0'
-                    onClick={() => {
-                      // 删除逻辑将在下一个任务添加
-                    }}
+                    onClick={() => handleDeleteRow(row.id)}
                   >
                     <Trash2 className='size-4' />
                   </Button>
