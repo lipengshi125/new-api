@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { AlertTriangle, Plus, Trash2 } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -41,7 +41,7 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
   const [rows, setRows] = useState<FlatRatioRow[]>([])
 
   // 从 props.value 初始化行数据
-  useMemo(() => {
+  useEffect(() => {
     setRows(flattenCustomRatios(value))
   }, [value])
 
@@ -98,42 +98,54 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
   )
 
   // 验证参数名格式
-  const validateParamName = (name: string): string | null => {
-    if (!name.trim()) return t('Parameter name is required')
-    if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
-      return t(
-        'Parameter name can only contain letters, numbers, underscores and hyphens'
-      )
-    }
-    return null
-  }
+  const validateParamName = useCallback(
+    (name: string): string | null => {
+      if (!name.trim()) return t('Parameter name is required')
+      if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+        return t(
+          'Parameter name can only contain letters, numbers, underscores and hyphens'
+        )
+      }
+      return null
+    },
+    [t]
+  )
 
   // 验证参数值
-  const validateParamValue = (value: string): string | null => {
-    if (!value.trim()) return t('Parameter value is required')
-    if (value.length > 100) return t('Parameter value is too long')
-    return null
-  }
+  const validateParamValue = useCallback(
+    (value: string): string | null => {
+      if (!value.trim()) return t('Parameter value is required')
+      if (value.length > 100) return t('Parameter value is too long')
+      return null
+    },
+    [t]
+  )
 
   // 验证倍率
-  const validateRatio = (ratio: number): string | null => {
-    if (ratio <= 0) return t('Multiplier must be greater than 0')
-    return null
-  }
+  const validateRatio = useCallback(
+    (ratio: number): string | null => {
+      if (ratio <= 0) return t('Multiplier must be greater than 0')
+      return null
+    },
+    [t]
+  )
 
   // 检查重复的参数名+参数值组合
-  const checkDuplicate = (
-    paramName: string,
-    paramValue: string,
-    currentId: string
-  ): boolean => {
-    return rows.some(
-      (row) =>
-        row.id !== currentId &&
-        row.paramName === paramName &&
-        row.paramValue === paramValue
-    )
-  }
+  const checkDuplicate = useCallback(
+    (
+      paramName: string,
+      paramValue: string,
+      currentId: string
+    ): boolean => {
+      return rows.some(
+        (row) =>
+          row.id !== currentId &&
+          row.paramName === paramName &&
+          row.paramValue === paramValue
+      )
+    },
+    [rows]
+  )
 
   // 获取每行的验证错误
   const getRowErrors = useCallback(
@@ -145,7 +157,7 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
         duplicate: checkDuplicate(row.paramName, row.paramValue, row.id),
       }
     },
-    [rows]
+    [validateParamName, validateParamValue, validateRatio, checkDuplicate]
   )
 
   return (
