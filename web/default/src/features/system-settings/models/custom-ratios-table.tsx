@@ -97,6 +97,57 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
     [rows, handleRowsChange]
   )
 
+  // 验证参数名格式
+  const validateParamName = (name: string): string | null => {
+    if (!name.trim()) return t('Parameter name is required')
+    if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+      return t(
+        'Parameter name can only contain letters, numbers, underscores and hyphens'
+      )
+    }
+    return null
+  }
+
+  // 验证参数值
+  const validateParamValue = (value: string): string | null => {
+    if (!value.trim()) return t('Parameter value is required')
+    if (value.length > 100) return t('Parameter value is too long')
+    return null
+  }
+
+  // 验证倍率
+  const validateRatio = (ratio: number): string | null => {
+    if (ratio <= 0) return t('Multiplier must be greater than 0')
+    return null
+  }
+
+  // 检查重复的参数名+参数值组合
+  const checkDuplicate = (
+    paramName: string,
+    paramValue: string,
+    currentId: string
+  ): boolean => {
+    return rows.some(
+      (row) =>
+        row.id !== currentId &&
+        row.paramName === paramName &&
+        row.paramValue === paramValue
+    )
+  }
+
+  // 获取每行的验证错误
+  const getRowErrors = useCallback(
+    (row: FlatRatioRow) => {
+      return {
+        paramName: validateParamName(row.paramName),
+        paramValue: validateParamValue(row.paramValue),
+        ratio: validateRatio(row.ratio),
+        duplicate: checkDuplicate(row.paramName, row.paramValue, row.id),
+      }
+    },
+    [rows]
+  )
+
   return (
     <div className='space-y-4'>
       <div>
@@ -140,78 +191,120 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
         ) : (
           <div className='divide-y'>
             {rows.map((row, index) => (
-              <div
-                key={row.id}
-                className={cn(
-                  'grid grid-cols-[1fr_1fr_120px_60px] gap-4 px-4 py-2',
-                  getRowBackground(row.paramName, index)
-                )}
-              >
-                {/* 参数名列 */}
-                <div className='flex items-center'>
-                  {isFirstRowOfParam(index) ? (
-                    <Input
-                      value={row.paramName}
-                      onChange={(e) =>
-                        handleFieldChange(row.id, 'paramName', e.target.value)
-                      }
-                      placeholder={t('Parameter Name')}
-                      className='h-8'
-                    />
-                  ) : (
-                    <div className='flex items-center gap-2'>
-                      <span className='text-muted-foreground'>↳</span>
+              <div key={row.id}>
+                <div
+                  className={cn(
+                    'grid grid-cols-[1fr_1fr_120px_60px] gap-4 px-4 py-2',
+                    getRowBackground(row.paramName, index)
+                  )}
+                >
+                  {/* 参数名列 */}
+                  <div className='flex items-center'>
+                    {isFirstRowOfParam(index) ? (
                       <Input
                         value={row.paramName}
                         onChange={(e) =>
                           handleFieldChange(row.id, 'paramName', e.target.value)
                         }
                         placeholder={t('Parameter Name')}
-                        className='h-8'
+                        className={cn(
+                          'h-8',
+                          getRowErrors(row).paramName && 'border-red-500'
+                        )}
                       />
-                    </div>
-                  )}
+                    ) : (
+                      <div className='flex items-center gap-2'>
+                        <span className='text-muted-foreground'>↳</span>
+                        <Input
+                          value={row.paramName}
+                          onChange={(e) =>
+                            handleFieldChange(row.id, 'paramName', e.target.value)
+                          }
+                          placeholder={t('Parameter Name')}
+                          className={cn(
+                            'h-8',
+                            getRowErrors(row).paramName && 'border-red-500'
+                          )}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 参数值列 */}
+                  <div className='flex items-center'>
+                    <Input
+                      value={row.paramValue}
+                      onChange={(e) =>
+                        handleFieldChange(row.id, 'paramValue', e.target.value)
+                      }
+                      placeholder={t('Parameter Value')}
+                      className={cn(
+                        'h-8',
+                        getRowErrors(row).paramValue && 'border-red-500'
+                      )}
+                    />
+                  </div>
+
+                  {/* 倍率列 */}
+                  <div className='flex items-center'>
+                    <Input
+                      type='number'
+                      step='0.01'
+                      min='0.01'
+                      value={row.ratio}
+                      onChange={(e) =>
+                        handleFieldChange(row.id, 'ratio', parseFloat(e.target.value) || 0)
+                      }
+                      placeholder='1.0'
+                      className={cn(
+                        'h-8',
+                        getRowErrors(row).ratio && 'border-red-500'
+                      )}
+                    />
+                  </div>
+
+                  {/* 操作列 */}
+                  <div className='flex items-center justify-end'>
+                    {/* 重复警告图标 */}
+                    {getRowErrors(row).duplicate && (
+                      <AlertTriangle className='text-amber-500 mr-2 size-4' />
+                    )}
+                    <Button
+                      type='button'
+                      variant='ghost'
+                      size='sm'
+                      className='size-8 p-0'
+                      onClick={() => handleDeleteRow(row.id)}
+                    >
+                      <Trash2 className='size-4' />
+                    </Button>
+                  </div>
                 </div>
 
-                {/* 参数值列 */}
-                <div className='flex items-center'>
-                  <Input
-                    value={row.paramValue}
-                    onChange={(e) =>
-                      handleFieldChange(row.id, 'paramValue', e.target.value)
-                    }
-                    placeholder={t('Parameter Value')}
-                    className='h-8'
-                  />
-                </div>
-
-                {/* 倍率列 */}
-                <div className='flex items-center'>
-                  <Input
-                    type='number'
-                    step='0.01'
-                    min='0.01'
-                    value={row.ratio}
-                    onChange={(e) =>
-                      handleFieldChange(row.id, 'ratio', parseFloat(e.target.value) || 0)
-                    }
-                    placeholder='1.0'
-                    className='h-8'
-                  />
-                </div>
-
-                {/* 操作列 */}
-                <div className='flex items-center justify-end'>
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='sm'
-                    className='size-8 p-0'
-                    onClick={() => handleDeleteRow(row.id)}
-                  >
-                    <Trash2 className='size-4' />
-                  </Button>
-                </div>
+                {/* 错误提示 */}
+                {(getRowErrors(row).paramName ||
+                  getRowErrors(row).paramValue ||
+                  getRowErrors(row).ratio ||
+                  getRowErrors(row).duplicate) && (
+                  <div className='px-4 pb-2 text-xs'>
+                    {getRowErrors(row).paramName && (
+                      <div className='text-red-500'>{getRowErrors(row).paramName}</div>
+                    )}
+                    {getRowErrors(row).paramValue && (
+                      <div className='text-red-500'>{getRowErrors(row).paramValue}</div>
+                    )}
+                    {getRowErrors(row).ratio && (
+                      <div className='text-red-500'>{getRowErrors(row).ratio}</div>
+                    )}
+                    {getRowErrors(row).duplicate && (
+                      <div className='text-amber-600'>
+                        {t(
+                          'This parameter value already exists and will override the previous configuration'
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
