@@ -87,6 +87,16 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
     [rows, handleRowsChange]
   )
 
+  const handleFieldChange = useCallback(
+    (id: string, field: keyof FlatRatioRow, value: string | number) => {
+      const newRows = rows.map((row) =>
+        row.id === id ? { ...row, [field]: value } : row
+      )
+      handleRowsChange(newRows)
+    },
+    [rows, handleRowsChange]
+  )
+
   return (
     <div className='space-y-4'>
       <div>
@@ -140,20 +150,54 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
                 {/* 参数名列 */}
                 <div className='flex items-center'>
                   {isFirstRowOfParam(index) ? (
-                    <span className='font-medium'>{row.paramName}</span>
+                    <Input
+                      value={row.paramName}
+                      onChange={(e) =>
+                        handleFieldChange(row.id, 'paramName', e.target.value)
+                      }
+                      placeholder={t('Parameter Name')}
+                      className='h-8'
+                    />
                   ) : (
-                    <span className='text-muted-foreground'>↳</span>
+                    <div className='flex items-center gap-2'>
+                      <span className='text-muted-foreground'>↳</span>
+                      <Input
+                        value={row.paramName}
+                        onChange={(e) =>
+                          handleFieldChange(row.id, 'paramName', e.target.value)
+                        }
+                        placeholder={t('Parameter Name')}
+                        className='h-8'
+                      />
+                    </div>
                   )}
                 </div>
 
                 {/* 参数值列 */}
                 <div className='flex items-center'>
-                  <span>{row.paramValue}</span>
+                  <Input
+                    value={row.paramValue}
+                    onChange={(e) =>
+                      handleFieldChange(row.id, 'paramValue', e.target.value)
+                    }
+                    placeholder={t('Parameter Value')}
+                    className='h-8'
+                  />
                 </div>
 
                 {/* 倍率列 */}
                 <div className='flex items-center'>
-                  <span>×{row.ratio}</span>
+                  <Input
+                    type='number'
+                    step='0.01'
+                    min='0.01'
+                    value={row.ratio}
+                    onChange={(e) =>
+                      handleFieldChange(row.id, 'ratio', parseFloat(e.target.value) || 0)
+                    }
+                    placeholder='1.0'
+                    className='h-8'
+                  />
                 </div>
 
                 {/* 操作列 */}
