@@ -53,6 +53,23 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
     [onChange]
   )
 
+  // 判断当前行是否是该参数名的第一行
+  const isFirstRowOfParam = (index: number): boolean => {
+    if (index === 0) return true
+    return rows[index].paramName !== rows[index - 1].paramName
+  }
+
+  // 获取相同参数名的行背景色
+  const getRowBackground = (paramName: string, index: number): string => {
+    // 找到该参数名首次出现的位置
+    const firstIndex = rows.findIndex((r) => r.paramName === paramName)
+    // 偶数组用浅色背景，奇数组用默认背景
+    const groupIndex = rows
+      .slice(0, firstIndex + 1)
+      .filter((_, i) => isFirstRowOfParam(i)).length
+    return groupIndex % 2 === 0 ? 'bg-muted/30' : ''
+  }
+
   return (
     <div className='space-y-4'>
       <div>
@@ -66,9 +83,67 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
         </p>
       </div>
 
-      {/* 表格内容将在后续任务添加 */}
-      <div className='text-muted-foreground text-sm'>
-        {t('Table will be added in next task')}
+      <div className='rounded-lg border'>
+        {/* 表格头 */}
+        <div className='grid grid-cols-[1fr_1fr_120px_60px] gap-4 border-b bg-muted/50 px-4 py-2 text-xs font-semibold'>
+          <div>{t('Parameter Name')}</div>
+          <div>{t('Parameter Value')}</div>
+          <div>{t('Multiplier')}</div>
+          <div>{t('Actions')}</div>
+        </div>
+
+        {/* 表格体 */}
+        {rows.length === 0 ? (
+          <div className='text-muted-foreground px-4 py-8 text-center text-sm'>
+            {t('No custom parameter multipliers configured')}
+          </div>
+        ) : (
+          <div className='divide-y'>
+            {rows.map((row, index) => (
+              <div
+                key={row.id}
+                className={cn(
+                  'grid grid-cols-[1fr_1fr_120px_60px] gap-4 px-4 py-2',
+                  getRowBackground(row.paramName, index)
+                )}
+              >
+                {/* 参数名列 */}
+                <div className='flex items-center'>
+                  {isFirstRowOfParam(index) ? (
+                    <span className='font-medium'>{row.paramName}</span>
+                  ) : (
+                    <span className='text-muted-foreground'>↳</span>
+                  )}
+                </div>
+
+                {/* 参数值列 */}
+                <div className='flex items-center'>
+                  <span>{row.paramValue}</span>
+                </div>
+
+                {/* 倍率列 */}
+                <div className='flex items-center'>
+                  <span>×{row.ratio}</span>
+                </div>
+
+                {/* 操作列 */}
+                <div className='flex items-center justify-end'>
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='sm'
+                    className='size-8 p-0'
+                    onClick={() => {
+                      // 删除逻辑将在下一个任务添加
+                    }}
+                  >
+                    <Trash2 className='size-4' />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
