@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { SystemBehaviorSection } from '../general/system-behavior-section'
 import { EmailSettingsSection } from '../integrations/email-settings-section'
 import { MonitoringSettingsSection } from '../integrations/monitoring-settings-section'
+import { R2StorageSettingsSection } from '../integrations/r2-storage-settings-section'
 import { WorkerSettingsSection } from '../integrations/worker-settings-section'
 import { LogSettingsSection } from '../maintenance/log-settings-section'
 import { PerformanceSection } from '../maintenance/performance-section'
@@ -88,6 +89,23 @@ const OPERATIONS_SECTIONS = [
           WorkerValidKey: settings.WorkerValidKey,
           WorkerAllowHttpImageRequestEnabled:
             settings.WorkerAllowHttpImageRequestEnabled,
+        }}
+      />
+    ),
+  },
+  {
+    id: 'r2-storage',
+    titleKey: 'Cloudflare R2 Storage',
+    build: (settings: OperationsSettings) => (
+      <R2StorageSettingsSection
+        defaultValues={{
+          R2StorageEnabled: settings.R2StorageEnabled ?? false,
+          R2Endpoint: settings.R2Endpoint ?? '',
+          R2Bucket: settings.R2Bucket ?? '',
+          R2KeyID: settings.R2KeyID ?? '',
+          R2Secret: settings.R2Secret ?? '',
+          R2PublicURL: settings.R2PublicURL ?? '',
+          R2StoragePath: settings.R2StoragePath ?? '',
         }}
       />
     ),

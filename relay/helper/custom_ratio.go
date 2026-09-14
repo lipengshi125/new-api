@@ -67,7 +67,7 @@ func extractFromJSONBody(c *gin.Context) map[string]string {
 	c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
 	// 解析 JSON
-	var bodyMap map[string]interface
+	var bodyMap map[string]interface{}
 	if err := common.Unmarshal(bodyBytes, &bodyMap); err != nil {
 		return result
 	}

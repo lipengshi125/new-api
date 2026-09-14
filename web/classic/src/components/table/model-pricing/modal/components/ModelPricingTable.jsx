@@ -75,9 +75,9 @@ const ModelPricingTable = ({
           Object.entries(valueMap).forEach(([paramValue, ratio]) => {
             priceItems.push({
               key: `custom-${paramName}-${paramValue}`,
-              label: `${paramName}=${paramValue}`,
-              value: `${ratio}`,
-              suffix: 'x',
+              label: `${t('参数')} ${paramName}=${paramValue}`,
+              value: `${t('价格')} ×${ratio}`,
+              suffix: '',
               isCustomRatio: true,
             });
           });

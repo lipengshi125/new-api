@@ -562,6 +562,9 @@ func updateOptionMap(key string, value string) (err error) {
 		err = ratio_setting.UpdateModelPriceUnitByJSONString(value)
 	case "CustomRatios":
 		err = ratio_setting.UpdateCustomRatiosByJSONString(value)
+		if err == nil {
+			InvalidatePricingCache()
+		}
 	case "CacheRatio":
 		err = ratio_setting.UpdateCacheRatioByJSONString(value)
 	case "CreateCacheRatio":
