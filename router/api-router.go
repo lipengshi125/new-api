@@ -378,5 +378,19 @@ func SetApiRouter(router *gin.Engine) {
 			deploymentsRoute.POST("/:id/extend", controller.ExtendDeployment)
 			deploymentsRoute.DELETE("/:id", controller.DeleteDeployment)
 		}
+
+		// Media upload routes
+		mediaRoute := apiRouter.Group("/media")
+		{
+			mediaRoute.POST("/upload", middleware.UserAuth(), controller.UploadMedia)
+		}
+
+		// R2 storage settings (admin only)
+		r2Route := apiRouter.Group("/r2")
+		r2Route.Use(middleware.RootAuth())
+		{
+			r2Route.POST("/test", controller.TestR2Connection)
+			r2Route.PUT("/settings", controller.UpdateR2Settings)
+		}
 	}
 }

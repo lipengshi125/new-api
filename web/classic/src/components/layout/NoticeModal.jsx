@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useEffect, useState, useContext, useMemo } from 'react';
+import React, { useEffect, useState, useContext, useMemo, useRef } from 'react';
 import {
   Button,
   Modal,
@@ -35,6 +35,7 @@ import {
 } from '@douyinfe/semi-illustrations';
 import { StatusContext } from '../../context/Status';
 import { Bell, Megaphone } from 'lucide-react';
+import { useActualTheme } from '../../context/Theme';
 
 const NoticeModal = ({
   visible,
@@ -43,10 +44,12 @@ const NoticeModal = ({
   defaultTab = 'inApp',
   unreadKeys = [],
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [noticeContent, setNoticeContent] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState(defaultTab);
+  const noticeRef = useRef(null);
+  const actualTheme = useActualTheme();
 
   const [statusState] = useContext(StatusContext);
 
@@ -116,6 +119,21 @@ const NoticeModal = ({
     }
   }, [defaultTab, visible]);
 
+  // 监听主题和语言变化，更新公告内容的属性
+  useEffect(() => {
+    if (!noticeRef.current) return;
+
+    const announcement = noticeRef.current.querySelector('#announcement');
+    if (announcement) {
+      // 更新主题
+      announcement.setAttribute('data-theme', actualTheme);
+
+      // 更新语言
+      const lang = i18n.language.startsWith('zh') ? 'zh' : 'en';
+      announcement.setAttribute('data-lang', lang);
+    }
+  }, [actualTheme, i18n.language, noticeContent]);
+
   const renderMarkdownNotice = () => {
     if (loading) {
       return (
@@ -143,6 +161,7 @@ const NoticeModal = ({
 
     return (
       <div
+        ref={noticeRef}
         dangerouslySetInnerHTML={{ __html: noticeContent }}
         className='notice-content-scroll max-h-[55vh] overflow-y-auto pr-2'
       />

@@ -76,6 +76,13 @@ func InitOptionMap() {
 	common.OptionMap["WorkerUrl"] = system_setting.WorkerUrl
 	common.OptionMap["WorkerValidKey"] = system_setting.WorkerValidKey
 	common.OptionMap["WorkerAllowHttpImageRequestEnabled"] = strconv.FormatBool(system_setting.WorkerAllowHttpImageRequestEnabled)
+	common.OptionMap["R2StorageEnabled"] = "false"
+	common.OptionMap["R2Endpoint"] = ""
+	common.OptionMap["R2Bucket"] = ""
+	common.OptionMap["R2KeyID"] = ""
+	common.OptionMap["R2Secret"] = ""
+	common.OptionMap["R2PublicURL"] = ""
+	common.OptionMap["R2StoragePath"] = ""
 	common.OptionMap["PayAddress"] = ""
 	common.OptionMap["CustomCallbackAddress"] = ""
 	common.OptionMap["EpayId"] = ""
@@ -387,6 +394,20 @@ func updateOptionMap(key string, value string) (err error) {
 		system_setting.WorkerUrl = value
 	case "WorkerValidKey":
 		system_setting.WorkerValidKey = value
+	case "R2StorageEnabled":
+		// R2 settings are read from OptionMap directly
+	case "R2Endpoint":
+		// R2 settings are read from OptionMap directly
+	case "R2Bucket":
+		// R2 settings are read from OptionMap directly
+	case "R2KeyID":
+		// R2 settings are read from OptionMap directly
+	case "R2Secret":
+		// R2 settings are read from OptionMap directly
+	case "R2PublicURL":
+		// R2 settings are read from OptionMap directly
+	case "R2StoragePath":
+		// R2 settings are read from OptionMap directly
 	case "PayAddress":
 		operation_setting.PayAddress = value
 	case "Chats":
@@ -539,6 +560,8 @@ func updateOptionMap(key string, value string) (err error) {
 		err = ratio_setting.UpdateModelPriceByJSONString(value)
 	case "ModelPriceUnit":
 		err = ratio_setting.UpdateModelPriceUnitByJSONString(value)
+	case "CustomRatios":
+		err = ratio_setting.UpdateCustomRatiosByJSONString(value)
 	case "CacheRatio":
 		err = ratio_setting.UpdateCacheRatioByJSONString(value)
 	case "CreateCacheRatio":

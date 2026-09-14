@@ -757,6 +757,11 @@ var billingUnitSecondsPrefixes = []string{
 // ("second" or "request"). It takes precedence over prefix detection.
 var modelPriceUnitMap = types.NewRWMap[string, string]()
 
+// customRatiosMap stores custom parameter-to-ratio mappings per model.
+// Format: model_name -> { param_name -> { param_value -> ratio } }
+// Example: "sora-1.0" -> { "resolution" -> { "1k": 1.0, "2k": 1.2, "4k": 1.5 } }
+var customRatiosMap = types.NewRWMap[string, map[string]map[string]float64]()
+
 func GetModelPriceUnitMap() map[string]string {
 	return modelPriceUnitMap.ReadAll()
 }
@@ -767,6 +772,28 @@ func ModelPriceUnit2JSONString() string {
 
 func UpdateModelPriceUnitByJSONString(jsonStr string) error {
 	return types.LoadFromJsonStringWithCallback(modelPriceUnitMap, jsonStr, InvalidateExposedDataCache)
+}
+
+func GetCustomRatiosMap() map[string]map[string]map[string]float64 {
+	return customRatiosMap.ReadAll()
+}
+
+func CustomRatios2JSONString() string {
+	return customRatiosMap.MarshalJSONString()
+}
+
+func UpdateCustomRatiosByJSONString(jsonStr string) error {
+	return types.LoadFromJsonStringWithCallback(customRatiosMap, jsonStr, InvalidateExposedDataCache)
+}
+
+// GetCustomRatios returns the custom parameter-to-ratio mappings for a model.
+// Returns nil if no custom ratios are configured for the model.
+func GetCustomRatios(modelName string) map[string]map[string]float64 {
+	formatted := FormatMatchingModelName(modelName)
+	if ratios, ok := customRatiosMap.Get(formatted); ok {
+		return ratios
+	}
+	return nil
 }
 
 // GetBillingUnit returns the billing unit for a model.

@@ -43,6 +43,7 @@ const EMPTY_MODEL = {
   audioOutputPrice: '',
   billingExpr: '',
   requestRuleExpr: '',
+  customRatios: {},
   rawRatios: {
     modelRatio: '',
     completionRatio: '',
@@ -170,6 +171,7 @@ const buildModelState = (name, sourceMaps) => {
   );
   const fixedPrice = toNumericString(sourceMaps.ModelPrice[name]);
   const billingUnit = sourceMaps.ModelPriceUnit?.[name] || inferBillingUnit(name);
+  const customRatios = sourceMaps.CustomRatios?.[name] || {};
   const inputPrice = ratioToBasePrice(modelRatio);
   const inputPriceNumber = toNumberOrNull(inputPrice);
   const audioInputPrice =
@@ -183,6 +185,7 @@ const buildModelState = (name, sourceMaps) => {
     billingMode: hasValue(fixedPrice) ? 'per-request' : 'per-token',
     fixedPrice,
     billingUnit,
+    customRatios,
     inputPrice,
     completionRatioLocked: completionRatioMeta.locked,
     lockedCompletionRatio: completionRatioMeta.ratio,
@@ -1082,6 +1085,14 @@ export function useModelPricingEditorState({
     return true;
   };
 
+  const handleCustomRatiosChange = (modelName, newCustomRatios) => {
+    setModels((prev) =>
+      prev.map((m) =>
+        m.name === modelName ? { ...m, customRatios: newCustomRatios } : m,
+      ),
+    );
+  };
+
   const handleSubmit = async () => {
     setLoading(true);
     try {
@@ -1095,6 +1106,7 @@ export function useModelPricingEditorState({
         ImageRatio: {},
         AudioRatio: {},
         AudioCompletionRatio: {},
+        CustomRatios: {},
       };
 
       const tieredOutput = {
@@ -1137,6 +1149,11 @@ export function useModelPricingEditorState({
         if (model.billingMode === 'per-request') {
           output.ModelPriceUnit[model.name] =
             model.billingUnit === 'second' ? 'second' : 'request';
+        }
+
+        // Save customRatios if present
+        if (model.customRatios && Object.keys(model.customRatios).length > 0) {
+          output.CustomRatios[model.name] = model.customRatios;
         }
       }
 
@@ -1197,6 +1214,7 @@ export function useModelPricingEditorState({
     handleBillingUnitChange,
     handleBillingExprChange,
     handleRequestRuleExprChange,
+    handleCustomRatiosChange,
     handleSubmit,
     addModel,
     deleteModel,

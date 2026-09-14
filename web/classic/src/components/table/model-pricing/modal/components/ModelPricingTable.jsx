@@ -66,6 +66,24 @@ const ModelPricingTable = ({
       const groupRatioValue =
         groupRatio && groupRatio[group] ? groupRatio[group] : 1;
 
+      // 获取价格项
+      const priceItems = getModelPriceItems(priceData, t, siteDisplayType);
+
+      // 如果有自定义倍率配置，添加到价格项中
+      if (modelData?.custom_ratios && Object.keys(modelData.custom_ratios).length > 0) {
+        Object.entries(modelData.custom_ratios).forEach(([paramName, valueMap]) => {
+          Object.entries(valueMap).forEach(([paramValue, ratio]) => {
+            priceItems.push({
+              key: `custom-${paramName}-${paramValue}`,
+              label: `${paramName}=${paramValue}`,
+              value: `${ratio}`,
+              suffix: 'x',
+              isCustomRatio: true,
+            });
+          });
+        });
+      }
+
       return {
         key: group,
         group: group,
@@ -78,7 +96,7 @@ const ModelPricingTable = ({
               : modelData?.quota_type === 1
                 ? t('按次计费')
                 : '-',
-        priceItems: getModelPriceItems(priceData, t, siteDisplayType),
+        priceItems: priceItems,
       };
     });
 
@@ -142,7 +160,7 @@ const ModelPricingTable = ({
           <div className='space-y-1'>
             {items.map((item) => (
               <div key={item.key}>
-                <div className='font-semibold text-orange-600'>
+                <div className={`font-semibold ${item.isCustomRatio ? 'text-purple-600' : 'text-orange-600'}`}>
                   {item.label} {item.value}
                 </div>
                 <div className='text-xs text-gray-500'>{item.suffix}</div>

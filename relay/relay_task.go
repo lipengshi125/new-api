@@ -195,6 +195,12 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 		}
 	}
 
+	// 5.3 应用自定义倍率配置：从请求参数中检测自定义字段（如 resolution、quality 等）
+	//     并应用管理员配置的倍率映射
+	if customRatios := ratio_setting.GetCustomRatios(modelName); len(customRatios) > 0 {
+		helper.ApplyCustomRatios(c, info, customRatios)
+	}
+
 	// 5.5 时长倍率仅在按秒计费时生效：按次计费的模型不应乘以 seconds/duration，
 	//     否则会按请求参数里的秒数放大扣费（例如 seconds:15 使按次价格被 x15）。
 	if ratio_setting.GetBillingUnit(modelName) != "second" {

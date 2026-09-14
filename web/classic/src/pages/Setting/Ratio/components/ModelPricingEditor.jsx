@@ -52,6 +52,7 @@ import {
 } from '../hooks/useModelPricingEditorState';
 import { useIsMobile } from '../../../../hooks/common/useIsMobile';
 import TieredPricingEditor from './TieredPricingEditor';
+import CustomRatiosEditor from './CustomRatiosEditor';
 
 const { Text } = Typography;
 const EMPTY_CANDIDATE_MODEL_NAMES = [];
@@ -130,6 +131,7 @@ export default function ModelPricingEditor({
     handleBillingUnitChange,
     handleBillingExprChange,
     handleRequestRuleExprChange,
+    handleCustomRatiosChange,
     handleSubmit,
     addModel,
     deleteModel,
@@ -750,6 +752,16 @@ export default function ModelPricingEditor({
                     </Card>
                   </>
                 )}
+
+                {selectedModel.billingMode !== 'tiered_expr' ? (
+                  <CustomRatiosEditor
+                    customRatios={selectedModel.customRatios || {}}
+                    onChange={(newCustomRatios) =>
+                      handleCustomRatiosChange(selectedModel.name, newCustomRatios)
+                    }
+                    t={t}
+                  />
+                ) : null}
 
                 <Card
                   bodyStyle={{ padding: 16 }}

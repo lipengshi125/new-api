@@ -72,6 +72,13 @@ const SystemSetting = () => {
     WorkerUrl: '',
     WorkerValidKey: '',
     WorkerAllowHttpImageRequestEnabled: '',
+    R2StorageEnabled: '',
+    R2Endpoint: '',
+    R2Bucket: '',
+    R2KeyID: '',
+    R2Secret: '',
+    R2PublicURL: '',
+    R2StoragePath: '',
     Footer: '',
     WeChatAuthEnabled: '',
     WeChatServerAddress: '',
@@ -314,6 +321,39 @@ const SystemSetting = () => {
       options.push({ key: 'WorkerValidKey', value: inputs.WorkerValidKey });
     }
     await updateOptions(options);
+  };
+
+  const submitR2Storage = async () => {
+    const options = [
+      { key: 'R2StorageEnabled', value: inputs.R2StorageEnabled ? 'true' : 'false' },
+      { key: 'R2Endpoint', value: inputs.R2Endpoint },
+      { key: 'R2Bucket', value: inputs.R2Bucket },
+      { key: 'R2PublicURL', value: removeTrailingSlash(inputs.R2PublicURL) },
+      { key: 'R2StoragePath', value: inputs.R2StoragePath },
+    ];
+    if (inputs.R2KeyID !== '') {
+      options.push({ key: 'R2KeyID', value: inputs.R2KeyID });
+    }
+    if (inputs.R2Secret !== '') {
+      options.push({ key: 'R2Secret', value: inputs.R2Secret });
+    }
+    await updateOptions(options);
+  };
+
+  const testR2Connection = async () => {
+    const res = await API.post('/api/r2/test', {
+      endpoint: inputs.R2Endpoint,
+      bucket: inputs.R2Bucket,
+      key_id: inputs.R2KeyID,
+      secret: inputs.R2Secret,
+      public_url: inputs.R2PublicURL,
+    });
+    const { success, message } = res.data;
+    if (success) {
+      showSuccess(t('R2 连接测试成功'));
+    } else {
+      showError(message);
+    }
   };
 
   const submitServerAddress = async () => {
@@ -816,6 +856,80 @@ const SystemSetting = () => {
                     {t('允许 HTTP 协议图片请求（适用于自部署代理）')}
                   </Form.Checkbox>
                   <Button onClick={submitWorker}>{t('更新Worker设置')}</Button>
+                </Form.Section>
+              </Card>
+
+              <Card>
+                <Form.Section text={t('Cloudflare R2 存储设置')}>
+                  <Text>
+                    {t('配置 Cloudflare R2 对象存储，用于文件上传和媒体托管')}
+                  </Text>
+                  <Form.Checkbox
+                    field='R2StorageEnabled'
+                    noLabel
+                  >
+                    {t('启用 R2 存储')}
+                  </Form.Checkbox>
+                  <Row
+                    gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
+                  >
+                    <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+                      <Form.Input
+                        field='R2Endpoint'
+                        label={t('R2 端点地址')}
+                        placeholder='https://<账号ID>.r2.cloudflarestorage.com'
+                      />
+                    </Col>
+                    <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+                      <Form.Input
+                        field='R2Bucket'
+                        label={t('存储桶名称')}
+                        placeholder='api'
+                      />
+                    </Col>
+                  </Row>
+                  <Row
+                    gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
+                  >
+                    <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+                      <Form.Input
+                        field='R2KeyID'
+                        label={t('Access Key ID')}
+                        placeholder='敏感信息不会发送到前端显示'
+                        type='password'
+                      />
+                    </Col>
+                    <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+                      <Form.Input
+                        field='R2Secret'
+                        label={t('Secret Access Key')}
+                        placeholder='敏感信息不会发送到前端显示'
+                        type='password'
+                      />
+                    </Col>
+                  </Row>
+                  <Row
+                    gutter={{ xs: 8, sm: 16, md: 24, lg: 24, xl: 24, xxl: 24 }}
+                  >
+                    <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+                      <Form.Input
+                        field='R2PublicURL'
+                        label={t('自定义域名')}
+                        placeholder='https://url.yunzao.qzz.io'
+                      />
+                    </Col>
+                    <Col xs={24} sm={24} md={12} lg={12} xl={12}>
+                      <Form.Input
+                        field='R2StoragePath'
+                        label={t('存储路径前缀')}
+                        placeholder='uploads/ (可选)'
+                      />
+                    </Col>
+                  </Row>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <Button onClick={submitR2Storage}>{t('更新 R2 设置')}</Button>
+                    <Button onClick={testR2Connection} type='tertiary'>{t('测试连接')}</Button>
+                  </div>
                 </Form.Section>
               </Card>
 

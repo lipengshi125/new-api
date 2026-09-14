@@ -1,40 +1,51 @@
-# Local build override for testing source changes (per-second billing UI).
-# Builds the image from local source instead of pulling calciumion/new-api:latest.
+# New-API Local Development Docker Compose
+# 本地构建配置 - 包含最新的 R2 功能
 #
-# Usage:
-#   docker compose -f docker-compose.local.yml up -d --build
-#   open http://localhost:3000
-#   docker compose -f docker-compose.local.yml down        # stop
-#   docker compose -f docker-compose.local.yml down -v      # stop + wipe data
+# 使用方法:
+#   docker-compose -f docker-compose.local.yml up -d --build
+
+version: '3.4'
 
 services:
   new-api:
     build:
       context: .
       dockerfile: Dockerfile
-    image: new-api:local
     container_name: new-api-local
-    restart: unless-stopped
+    restart: always
     command: --log-dir /app/logs
     ports:
-      - "3001:3000"
+      - "3000:3000"
     volumes:
       - ./data:/data
       - ./logs:/app/logs
     environment:
-      - SQL_DSN=root:123456@tcp(mysql:3306)/newapi
+      # 数据库配置 - PostgreSQL
+      - SQL_DSN=postgresql://root:123456@postgres:5432/new-api
+
+      # Redis 配置
       - REDIS_CONN_STRING=redis://:123456@redis:6379
+
+      # 时区
       - TZ=Asia/Shanghai
+
+      # 功能开关
       - GLOBAL_API_RATE_LIMIT_ENABLE=false
       - GLOBAL_WEB_RATE_LIMIT_ENABLE=false
       - ERROR_LOG_ENABLED=true
       - BATCH_UPDATE_ENABLED=true
+
+      # 节点名称
       - NODE_NAME=new-api-local
+
+      # 可选：如果需要外部访问，取消注释下面这行并修改为你的域名
+      # - SERVER_ADDRESS=http://localhost:3000
+
     depends_on:
       - redis
-      - mysql
+      - postgres
     networks:
-      - new-api-local-network
+      - new-api-network
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/api/status | grep -o '\"success\":\\s*true' || exit 1"]
       interval: 30s
@@ -44,29 +55,27 @@ services:
   redis:
     image: redis:8-alpine
     container_name: redis-local
-    restart: unless-stopped
+    restart: always
     command: ["redis-server", "--requirepass", "123456"]
     networks:
-      - new-api-local-network
+      - new-api-network
 
-  mysql:
-    image: mysql:8.0
-    container_name: mysql-local
-    restart: unless-stopped
+  postgres:
+    image: postgres:15
+    container_name: postgres-local
+    restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: 123456
-      MYSQL_DATABASE: newapi
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: new-api
     volumes:
-      - mysql_data_local:/var/lib/mysql
-    ports:
-      - "3307:3306"
+      - pg_data_local:/var/lib/postgresql/data
     networks:
-      - new-api-local-network
+      - new-api-network
 
 volumes:
-  mysql_data_local:
+  pg_data_local:
 
 networks:
-  new-api-local-network:
+  new-api-network:
     driver: bridge
