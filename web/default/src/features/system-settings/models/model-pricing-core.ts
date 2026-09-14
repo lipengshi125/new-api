@@ -85,6 +85,7 @@ export type ModelRatioData = {
   billingExpr?: string
   requestRuleExpr?: string
   billingUnit?: BillingUnit
+  customRatios?: Record<string, Record<string, number>>
 }
 
 export type PreviewRow = {
@@ -318,4 +319,53 @@ export function buildPreviewRows(
           : t('Empty'),
     },
   ]
+}
+
+export type FlatRatioRow = {
+  id: string
+  paramName: string
+  paramValue: string
+  ratio: number
+}
+
+/**
+ * 将嵌套的 customRatios 结构转换为扁平的行数组，便于表格渲染
+ */
+export function flattenCustomRatios(
+  ratios: Record<string, Record<string, number>>
+): FlatRatioRow[] {
+  const rows: FlatRatioRow[] = []
+  Object.entries(ratios).forEach(([paramName, valueMap]) => {
+    Object.entries(valueMap).forEach(([paramValue, ratio]) => {
+      rows.push({
+        id: `${paramName}::${paramValue}`,
+        paramName,
+        paramValue,
+        ratio,
+      })
+    })
+  })
+  // 按参数名排序，相同参数名的行连续显示
+  return rows.sort((a, b) => {
+    if (a.paramName === b.paramName) {
+      return a.paramValue.localeCompare(b.paramValue)
+    }
+    return a.paramName.localeCompare(b.paramName)
+  })
+}
+
+/**
+ * 将扁平的行数组转换回嵌套的 customRatios 结构
+ */
+export function unflattenCustomRatios(
+  rows: FlatRatioRow[]
+): Record<string, Record<string, number>> {
+  const ratios: Record<string, Record<string, number>> = {}
+  rows.forEach((row) => {
+    if (!ratios[row.paramName]) {
+      ratios[row.paramName] = {}
+    }
+    ratios[row.paramName][row.paramValue] = row.ratio
+  })
+  return ratios
 }
