@@ -88,6 +88,7 @@ import {
 import { PriceInput, PriceLane } from './model-pricing-inputs'
 import { formatPricingNumber } from './pricing-format'
 import { TieredPricingEditor } from './tiered-pricing-editor'
+import { CustomRatiosTable } from './custom-ratios-table'
 
 export type { ModelRatioData } from './model-pricing-core'
 
@@ -163,6 +164,9 @@ export const ModelPricingEditorPanel = forwardRef<
   const [requestRuleExpr, setRequestRuleExpr] = useState('')
   const [billingUnit, setBillingUnit] = useState<BillingUnit>('request')
   const [editorReloadToken, setEditorReloadToken] = useState(0)
+  const [customRatios, setCustomRatios] = useState<
+    Record<string, Record<string, number>>
+  >({})
   const isEditMode = !!editData
 
   const form = useForm<ModelPricingFormValues>({
@@ -205,6 +209,11 @@ export const ModelPricingEditorPanel = forwardRef<
       setBillingExpr(editData.billingExpr || '')
       setRequestRuleExpr(editData.requestRuleExpr || '')
       setBillingUnit(editData.billingUnit || inferBillingUnit(editData.name))
+      if (editData?.customRatios) {
+        setCustomRatios(editData.customRatios)
+      } else {
+        setCustomRatios({})
+      }
     } else {
       form.reset({
         name: '',
@@ -221,6 +230,7 @@ export const ModelPricingEditorPanel = forwardRef<
       setBillingExpr('')
       setRequestRuleExpr('')
       setBillingUnit('request')
+      setCustomRatios({})
     }
 
     setPromptPrice(nextLaneState.promptPrice)
@@ -471,9 +481,13 @@ export const ModelPricingEditorPanel = forwardRef<
         data.billingUnit = billingUnit
       }
 
+      if (Object.keys(customRatios).length > 0) {
+        data.customRatios = customRatios
+      }
+
       return data
     },
-    [billingExpr, billingUnit, pricingMode, requestRuleExpr]
+    [billingExpr, billingUnit, pricingMode, requestRuleExpr, customRatios]
   )
 
   useImperativeHandle(
@@ -681,6 +695,16 @@ export const ModelPricingEditorPanel = forwardRef<
                     </FieldGroup>
                   </TabsContent>
                 </Tabs>
+
+                {/* 自定义倍率参数 */}
+                {pricingMode !== 'tiered_expr' && (
+                  <div className='mt-6'>
+                    <CustomRatiosTable
+                      value={customRatios}
+                      onChange={setCustomRatios}
+                    />
+                  </div>
+                )}
               </FieldGroup>
 
               <aside className='bg-muted/20 sticky top-0 rounded-lg border'>
