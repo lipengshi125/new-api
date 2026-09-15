@@ -267,6 +267,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
     savedAudioCompletionRatio,
     savedBillingMode,
     savedBillingExpr,
+    savedCustomRatios,
     modelPrice,
     modelRatio,
     cacheRatio,
@@ -277,6 +278,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
     audioCompletionRatio,
     billingMode,
     billingExpr,
+    customRatios,
   ])
 
   const modeCounts = useMemo(

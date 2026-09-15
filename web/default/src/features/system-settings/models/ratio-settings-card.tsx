@@ -117,6 +117,7 @@ const createModelSchema = (t: Translate) =>
     BillingMode: createJsonStringField(t),
     BillingExpr: createJsonStringField(t),
     ModelPriceUnit: createJsonStringField(t),
+    CustomRatios: createJsonStringField(t),
   })
 
 const createGroupSchema = (t: Translate) =>
@@ -267,6 +268,7 @@ export function RatioSettingsCard({
       BillingMode: normalizeJsonString(modelDefaults.BillingMode),
       BillingExpr: normalizeJsonString(modelDefaults.BillingExpr),
       ModelPriceUnit: normalizeJsonString(modelDefaults.ModelPriceUnit),
+      CustomRatios: normalizeJsonString(modelDefaults.CustomRatios),
     }
     setSavedModelValues(modelNormalizedDefaults.current)
 
@@ -329,6 +331,7 @@ export function RatioSettingsCard({
         BillingMode: normalizeJsonString(values.BillingMode),
         BillingExpr: normalizeJsonString(values.BillingExpr),
         ModelPriceUnit: normalizeJsonString(values.ModelPriceUnit),
+        CustomRatios: normalizeJsonString(values.CustomRatios),
       }
 
       const apiKeyMap: Record<string, string> = {
