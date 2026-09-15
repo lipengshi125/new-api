@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
@@ -15,8 +14,8 @@ import (
 
 // UploadMedia handles file upload to R2 storage
 func UploadMedia(c *gin.Context) {
-	// Get user from context (set by auth middleware)
-	userId := c.GetInt(string(constant.ContextKeyUserId))
+	// Get user from context (set by TokenAuth middleware)
+	userId := c.GetInt("id")
 	if userId == 0 {
 		common.ApiErrorMsg(c, "unauthorized")
 		return

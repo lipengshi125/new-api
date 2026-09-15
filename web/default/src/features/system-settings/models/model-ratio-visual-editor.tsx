@@ -78,6 +78,7 @@ type ModelRatioVisualEditorProps = {
   savedAudioCompletionRatio: string
   savedBillingMode: string
   savedBillingExpr: string
+  savedCustomRatios: string
   modelPrice: string
   modelRatio: string
   cacheRatio: string
@@ -88,6 +89,7 @@ type ModelRatioVisualEditorProps = {
   audioCompletionRatio: string
   billingMode: string
   billingExpr: string
+  customRatios: string
   savedModelPriceUnit: string
   modelPriceUnit: string
   candidateModelNames?: string[]
@@ -119,6 +121,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
     savedAudioCompletionRatio,
     savedBillingMode,
     savedBillingExpr,
+    savedCustomRatios,
     modelPrice,
     modelRatio,
     cacheRatio,
@@ -129,6 +132,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
     audioCompletionRatio,
     billingMode,
     billingExpr,
+    customRatios,
     savedModelPriceUnit,
     modelPriceUnit,
     candidateModelNames,
@@ -205,6 +209,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       audioCompletionRatio: savedAudioCompletionRatio,
       billingMode: savedBillingMode,
       billingExpr: savedBillingExpr,
+      customRatios: savedCustomRatios,
     })
     const draftRows = buildModelSnapshots({
       modelPrice,
@@ -217,6 +222,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       audioCompletionRatio,
       billingMode,
       billingExpr,
+      customRatios,
     })
 
     const savedByName = new Map(savedRows.map((row) => [row.name, row]))

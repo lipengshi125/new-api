@@ -382,7 +382,7 @@ func SetApiRouter(router *gin.Engine) {
 		// Media upload routes
 		mediaRoute := apiRouter.Group("/media")
 		{
-			mediaRoute.POST("/upload", middleware.UserAuth(), controller.UploadMedia)
+			mediaRoute.POST("/upload", middleware.TokenAuth(), controller.UploadMedia)
 		}
 
 		// R2 storage settings (admin only)
