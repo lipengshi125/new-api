@@ -45,7 +45,8 @@ func NewR2StorageService(cfg *R2StorageConfig) (*R2StorageService, error) {
 	// Create AWS SDK configuration for R2
 	r2Resolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 		return aws.Endpoint{
-			URL: cfg.Endpoint,
+			URL:               cfg.Endpoint,
+			HostnameImmutable: true, // Force path-style addressing for R2
 		}, nil
 	})
 
@@ -62,7 +63,10 @@ func NewR2StorageService(cfg *R2StorageConfig) (*R2StorageService, error) {
 		return nil, fmt.Errorf("failed to create R2 config: %w", err)
 	}
 
-	client := s3.NewFromConfig(awsCfg)
+	// Create S3 client with path-style addressing
+	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+		o.UsePathStyle = true // Force path-style URLs for R2
+	})
 
 	return &R2StorageService{
 		config: cfg,

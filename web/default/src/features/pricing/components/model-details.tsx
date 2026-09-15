@@ -1115,6 +1115,66 @@ function GroupPricingSection(props: {
   )
 }
 
+// ----------------------------------------------------------------------------
+// Custom ratios section
+// ----------------------------------------------------------------------------
+
+function CustomRatiosSection(props: {
+  customRatios: Record<string, Record<string, number>>
+}) {
+  const { t } = useTranslation()
+
+  const flatRows = useMemo(() => {
+    const rows: Array<{ paramName: string; paramValue: string; ratio: number }> = []
+    Object.entries(props.customRatios).forEach(([paramName, valueMap]) => {
+      Object.entries(valueMap).forEach(([paramValue, ratio]) => {
+        rows.push({ paramName, paramValue, ratio })
+      })
+    })
+    return rows
+  }, [props.customRatios])
+
+  if (flatRows.length === 0) return null
+
+  return (
+    <section>
+      <SectionTitle>{t('Parameter Multipliers')}</SectionTitle>
+      <div className='bg-muted/20 overflow-hidden rounded-lg border'>
+        <table className='w-full text-sm'>
+          <thead className='bg-muted/30 border-b'>
+            <tr>
+              <th className='text-muted-foreground px-3 py-2 text-left text-xs font-medium'>
+                {t('Parameter Name')}
+              </th>
+              <th className='text-muted-foreground px-3 py-2 text-left text-xs font-medium'>
+                {t('Parameter Value')}
+              </th>
+              <th className='text-muted-foreground px-3 py-2 text-right text-xs font-medium'>
+                {t('Multiplier')}
+              </th>
+            </tr>
+          </thead>
+          <tbody className='divide-y'>
+            {flatRows.map((row, idx) => (
+              <tr key={idx} className='hover:bg-muted/20 transition-colors'>
+                <td className='text-foreground px-3 py-2.5 font-medium'>
+                  {row.paramName}
+                </td>
+                <td className='text-muted-foreground px-3 py-2.5'>
+                  {row.paramValue}
+                </td>
+                <td className='text-foreground px-3 py-2.5 text-right font-mono font-semibold'>
+                  ×{row.ratio}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
 const TAB_VALUES = ['overview', 'performance', 'api'] as const
 type TabValue = (typeof TAB_VALUES)[number]
 
@@ -1193,6 +1253,10 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
               tokenUnit={props.tokenUnit}
               showRechargePrice={showRechargePrice}
             />
+            {props.model.custom_ratios &&
+              Object.keys(props.model.custom_ratios).length > 0 && (
+                <CustomRatiosSection customRatios={props.model.custom_ratios} />
+              )}
           </section>
 
           <ModelBackendDetailsSection model={props.model} />
