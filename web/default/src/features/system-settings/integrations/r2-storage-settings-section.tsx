@@ -77,7 +77,6 @@ export function R2StorageSettingsSection({
   defaultValues,
 }: R2StorageSettingsSectionProps) {
   const { t } = useTranslation()
-  const { toast } = useToast()
   const updateOption = useUpdateOption()
   const r2Schema = createR2Schema(t)
   const [isTesting, setIsTesting] = useState(false)
