@@ -17,10 +17,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { AlertTriangle, Plus, Trash2 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
@@ -38,12 +37,16 @@ type CustomRatiosTableProps = {
 
 export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
   const { t } = useTranslation()
-  const [rows, setRows] = useState<FlatRatioRow[]>([])
-
-  // 从 props.value 初始化行数据
-  useEffect(() => {
-    setRows(flattenCustomRatios(value))
-  }, [value])
+  // 本组件自持行状态：行的 id 由本地稳定分配，永不从内容派生，
+  // 避免编辑时因 id 变化触发 <Input> 卸载重挂而丢失焦点。
+  // 切换模型时通过调用处的 key={editorReloadToken} 重新挂载来重新播种。
+  const idRef = useRef(0)
+  const [rows, setRows] = useState<FlatRatioRow[]>(() =>
+    flattenCustomRatios(value).map((row) => ({
+      ...row,
+      id: `row-${idRef.current++}`,
+    }))
+  )
 
   const handleRowsChange = useCallback(
     (newRows: FlatRatioRow[]) => {
@@ -60,7 +63,7 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
   }
 
   // 获取相同参数名的行背景色
-  const getRowBackground = (paramName: string, index: number): string => {
+  const getRowBackground = (paramName: string): string => {
     // 找到该参数名首次出现的位置
     const firstIndex = rows.findIndex((r) => r.paramName === paramName)
     // 偶数组用浅色背景，奇数组用默认背景
@@ -72,7 +75,7 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
 
   const handleAddRow = useCallback(() => {
     const newRow: FlatRatioRow = {
-      id: `new-${Date.now()}`,
+      id: `row-${idRef.current++}`,
       paramName: '',
       paramValue: '',
       ratio: 1.0,
@@ -207,7 +210,7 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
                 <div
                   className={cn(
                     'grid grid-cols-[1fr_1fr_120px_60px] gap-4 px-4 py-2',
-                    getRowBackground(row.paramName, index)
+                    getRowBackground(row.paramName)
                   )}
                 >
                   {/* 参数名列 */}

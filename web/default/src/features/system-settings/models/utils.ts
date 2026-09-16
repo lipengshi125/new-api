@@ -30,6 +30,9 @@ export function formatJsonForTextarea(value: string) {
 }
 
 export function normalizeJsonString(value: string) {
+  if (!value) {
+    return ''
+  }
   const trimmed = value.trim()
   if (!trimmed) {
     return ''
@@ -147,7 +150,7 @@ export function validateJsonString(
   options: JsonValidationOptions = {}
 ) {
   const { allowEmpty = true, predicate, predicateMessage } = options
-  const trimmed = value.trim()
+  const trimmed = value ? value.trim() : ''
 
   if (!trimmed) {
     return {

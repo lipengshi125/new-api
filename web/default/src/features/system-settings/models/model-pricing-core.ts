@@ -362,10 +362,15 @@ export function unflattenCustomRatios(
 ): Record<string, Record<string, number>> {
   const ratios: Record<string, Record<string, number>> = {}
   rows.forEach((row) => {
-    if (!ratios[row.paramName]) {
-      ratios[row.paramName] = {}
+    // 跳过尚未填写完整的行：空的参数名/参数值不应写入，
+    // 既让编辑中的空行保持可编辑，又避免污染保存的数据。
+    const name = row.paramName.trim()
+    const val = row.paramValue.trim()
+    if (!name || !val) return
+    if (!ratios[name]) {
+      ratios[name] = {}
     }
-    ratios[row.paramName][row.paramValue] = row.ratio
+    ratios[name][val] = row.ratio
   })
   return ratios
 }

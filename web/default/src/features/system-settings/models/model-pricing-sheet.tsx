@@ -700,6 +700,7 @@ export const ModelPricingEditorPanel = forwardRef<
                 {pricingMode !== 'tiered_expr' && (
                   <div className='mt-6'>
                     <CustomRatiosTable
+                      key={editorReloadToken}
                       value={customRatios}
                       onChange={setCustomRatios}
                     />

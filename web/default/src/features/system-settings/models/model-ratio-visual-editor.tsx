@@ -555,6 +555,9 @@ const ModelRatioVisualEditorComponent = forwardRef<
         modelPriceUnit,
         { fallback: {}, silent: true }
       )
+      const customRatiosMap = safeJsonParse<
+        Record<string, Record<string, Record<string, number>>>
+      >(customRatios, { fallback: {}, silent: true })
 
       const setIfPresent = (
         target: Record<string, number>,
@@ -578,6 +581,11 @@ const ModelRatioVisualEditorComponent = forwardRef<
         delete billingModeMap[name]
         delete billingExprMap[name]
         delete priceUnitMap[name]
+        delete customRatiosMap[name]
+
+        if (data.customRatios && Object.keys(data.customRatios).length > 0) {
+          customRatiosMap[name] = data.customRatios
+        }
 
         if (data.billingMode === 'tiered_expr') {
           const combined = combineBillingExpr(
@@ -637,6 +645,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
         JSON.stringify(billingExprMap, null, 2)
       )
       onChange('ModelPriceUnit', JSON.stringify(priceUnitMap, null, 2))
+      onChange('CustomRatios', JSON.stringify(customRatiosMap, null, 2))
     },
     [
       modelPrice,
@@ -650,6 +659,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       billingMode,
       billingExpr,
       modelPriceUnit,
+      customRatios,
       onChange,
     ]
   )
