@@ -362,11 +362,13 @@ export function unflattenCustomRatios(
 ): Record<string, Record<string, number>> {
   const ratios: Record<string, Record<string, number>> = {}
   rows.forEach((row) => {
-    // 跳过尚未填写完整的行：空的参数名/参数值不应写入，
-    // 既让编辑中的空行保持可编辑，又避免污染保存的数据。
+    // 跳过尚未填写完整或非法的行：空的参数名/参数值、以及非正/非有限的倍率
+    // 都不应写入，既让编辑中的行保持可编辑，又避免污染保存的数据
+    // （表格已对这些行显示红框校验提示）。
     const name = row.paramName.trim()
     const val = row.paramValue.trim()
     if (!name || !val) return
+    if (!Number.isFinite(row.ratio) || row.ratio <= 0) return
     if (!ratios[name]) {
       ratios[name] = {}
     }
