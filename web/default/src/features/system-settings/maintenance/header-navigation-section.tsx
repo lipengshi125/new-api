@@ -17,11 +17,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Plus, Trash2 } from 'lucide-react'
 import { useEffect, useMemo } from 'react'
-import { useForm } from 'react-hook-form'
+import { useFieldArray, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import * as z from 'zod'
 
+import { Button } from '@/components/ui/button'
 import {
   Form,
   FormControl,
@@ -30,7 +32,9 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
+import { sanitizeNavUrl } from '@/lib/nav-modules'
 
 import {
   SettingsControlChildren,
@@ -57,9 +61,24 @@ const headerNavSchema = z.object({
   rankingsRequireAuth: z.boolean(),
   docs: z.boolean(),
   about: z.boolean(),
+  custom: z.array(
+    z.object({
+      name: z.string().trim().min(1, 'Please enter a name'),
+      url: z
+        .string()
+        .refine(
+          (value) => sanitizeNavUrl(value) !== '',
+          'Enter a full https:// address or an in-app path such as /about'
+        ),
+      enabled: z.boolean(),
+      requireAuth: z.boolean(),
+    })
+  ),
 })
 
 type HeaderNavFormValues = z.infer<typeof headerNavSchema>
+
+type HeaderNavSwitchField = Exclude<keyof HeaderNavFormValues, 'custom'>
 
 type HeaderNavigationSectionProps = {
   config: HeaderNavModulesConfig
@@ -95,6 +114,12 @@ const toFormValues = (config: HeaderNavModulesConfig): HeaderNavFormValues => ({
     config.about === undefined
       ? HEADER_NAV_DEFAULT.about
       : Boolean(config.about),
+  custom: (config.custom ?? []).map((item) => ({
+    name: item.name,
+    url: item.url,
+    enabled: item.enabled,
+    requireAuth: item.requireAuth,
+  })),
 })
 
 export function HeaderNavigationSection({
@@ -103,12 +128,20 @@ export function HeaderNavigationSection({
 }: HeaderNavigationSectionProps) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
-  const formDefaults = useMemo(() => toFormValues(config), [config])
+  // `config` is a fresh object on every parent render, so key the defaults off
+  // the serialized value instead: otherwise an unrelated re-render would reset
+  // the form and wipe half-typed custom entries.
+  const formDefaults = useMemo(
+    () => toFormValues(config),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [initialSerialized]
+  )
 
   const form = useForm<HeaderNavFormValues>({
     resolver: zodResolver(headerNavSchema),
     defaultValues: formDefaults,
   })
+  const customItems = useFieldArray({ control: form.control, name: 'custom' })
 
   useEffect(() => {
     form.reset(formDefaults)
@@ -131,6 +164,14 @@ export function HeaderNavigationSection({
         enabled: values.rankingsEnabled,
         requireAuth: values.rankingsRequireAuth,
       },
+      // Store the normalized target so the header and the backend see the same
+      // value the admin will get back on the next edit.
+      custom: values.custom.map((item) => ({
+        name: item.name.trim(),
+        url: sanitizeNavUrl(item.url),
+        enabled: item.enabled,
+        requireAuth: item.requireAuth,
+      })),
     }
 
     const serialized = serializeHeaderNavModules(payload)
@@ -149,7 +190,7 @@ export function HeaderNavigationSection({
   }
 
   const simpleModules: Array<{
-    key: keyof HeaderNavFormValues
+    key: HeaderNavSwitchField
     title: string
     description: string
   }> = [
@@ -176,8 +217,8 @@ export function HeaderNavigationSection({
   ]
 
   const accessModules: Array<{
-    enabledKey: keyof HeaderNavFormValues
-    requireAuthKey: keyof HeaderNavFormValues
+    enabledKey: HeaderNavSwitchField
+    requireAuthKey: HeaderNavSwitchField
     requireAuthDependsOn: 'pricingEnabled' | 'rankingsEnabled'
     title: string
     description: string
@@ -293,6 +334,134 @@ export function HeaderNavigationSection({
                 />
               </SettingsControlGroup>
             ))}
+          </div>
+
+          <div className='space-y-3'>
+            <div className='flex flex-wrap items-start justify-between gap-3'>
+              <div className='space-y-0.5'>
+                <FormLabel className='text-sm font-medium'>
+                  {t('Custom pages')}
+                </FormLabel>
+                <FormDescription>
+                  {t(
+                    'Extra header entries. Clicking the name opens the address you enter: a full https:// URL opens in a new tab, a path such as /about stays in the app.'
+                  )}
+                </FormDescription>
+              </div>
+              <Button
+                type='button'
+                variant='outline'
+                size='sm'
+                onClick={() =>
+                  customItems.append({
+                    name: '',
+                    url: '',
+                    enabled: true,
+                    requireAuth: false,
+                  })
+                }
+              >
+                <Plus className='mr-2 h-4 w-4' />
+                {t('Add page')}
+              </Button>
+            </div>
+
+            {customItems.fields.length === 0 ? (
+              <p className='text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm'>
+                {t('No custom pages yet. Click "Add page" to create one.')}
+              </p>
+            ) : (
+              <div className='space-y-3'>
+                {customItems.fields.map((field, index) => (
+                  <SettingsControlGroup key={field.id} className='space-y-2.5'>
+                    <div className='grid gap-3 sm:grid-cols-2'>
+                      <FormField
+                        control={form.control}
+                        name={`custom.${index}.name`}
+                        render={({ field: nameField }) => (
+                          <div className='space-y-1.5'>
+                            <FormLabel>{t('Name')}</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder={t('Help Center')}
+                                {...nameField}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </div>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`custom.${index}.url`}
+                        render={({ field: urlField }) => (
+                          <div className='space-y-1.5'>
+                            <FormLabel>{t('Link address')}</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder='https://help.example.com'
+                                {...urlField}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </div>
+                        )}
+                      />
+                    </div>
+
+                    <div className='flex flex-wrap items-center justify-between gap-x-6 gap-y-2'>
+                      <FormField
+                        control={form.control}
+                        name={`custom.${index}.enabled`}
+                        render={({ field: enabledField }) => (
+                          <div className='flex items-center gap-2'>
+                            <FormControl>
+                              <Switch
+                                checked={enabledField.value}
+                                onCheckedChange={enabledField.onChange}
+                              />
+                            </FormControl>
+                            <FormLabel className='text-xs font-medium'>
+                              {t('Show in navigation')}
+                            </FormLabel>
+                          </div>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`custom.${index}.requireAuth`}
+                        render={({ field: requireAuthField }) => (
+                          <div className='flex items-center gap-2'>
+                            <FormControl>
+                              <Switch
+                                checked={requireAuthField.value}
+                                onCheckedChange={requireAuthField.onChange}
+                                disabled={
+                                  !form.watch(`custom.${index}.enabled`)
+                                }
+                              />
+                            </FormControl>
+                            <FormLabel className='text-xs font-medium'>
+                              {t('Require login to open')}
+                            </FormLabel>
+                          </div>
+                        )}
+                      />
+                      <Button
+                        type='button'
+                        variant='ghost'
+                        size='sm'
+                        className='ms-auto'
+                        onClick={() => customItems.remove(index)}
+                        aria-label={t('Delete')}
+                      >
+                        <Trash2 className='h-4 w-4' />
+                      </Button>
+                    </div>
+                  </SettingsControlGroup>
+                ))}
+              </div>
+            )}
           </div>
         </SettingsForm>
       </Form>

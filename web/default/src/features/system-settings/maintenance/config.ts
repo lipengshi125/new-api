@@ -21,6 +21,17 @@ export type HeaderNavAccessConfig = {
   requireAuth: boolean
 }
 
+/**
+ * Admin-defined header entry. `url` accepts an absolute `http(s)` URL (opened
+ * in a new tab) or an in-app path such as `/about`.
+ */
+export type HeaderNavCustomItemConfig = {
+  name: string
+  url: string
+  enabled: boolean
+  requireAuth: boolean
+}
+
 export type HeaderNavModulesConfig = {
   home: boolean
   console: boolean
@@ -28,7 +39,8 @@ export type HeaderNavModulesConfig = {
   rankings: HeaderNavAccessConfig
   docs: boolean
   about: boolean
-  [key: string]: boolean | HeaderNavAccessConfig
+  custom: HeaderNavCustomItemConfig[]
+  [key: string]: boolean | HeaderNavAccessConfig | HeaderNavCustomItemConfig[]
 }
 
 export type SidebarSectionConfig = {
@@ -51,6 +63,7 @@ export const HEADER_NAV_DEFAULT: HeaderNavModulesConfig = {
   },
   docs: true,
   about: true,
+  custom: [],
 }
 
 export const SIDEBAR_MODULES_DEFAULT: SidebarModulesAdminConfig = {
@@ -98,6 +111,7 @@ const cloneHeaderNavDefault = (): HeaderNavModulesConfig => ({
   ...HEADER_NAV_DEFAULT,
   pricing: { ...HEADER_NAV_DEFAULT.pricing },
   rankings: { ...HEADER_NAV_DEFAULT.rankings },
+  custom: [],
 })
 
 const parseAccessModule = (
@@ -124,6 +138,27 @@ const parseAccessModule = (
   return { ...fallback }
 }
 
+const parseCustomItems = (raw: unknown): HeaderNavCustomItemConfig[] => {
+  if (!Array.isArray(raw)) return []
+
+  return raw.reduce<HeaderNavCustomItemConfig[]>((items, entry) => {
+    if (!entry || typeof entry !== 'object') return items
+
+    const record = entry as Record<string, unknown>
+    const name = typeof record.name === 'string' ? record.name : ''
+    const url = typeof record.url === 'string' ? record.url : ''
+    if (name.trim() === '' && url.trim() === '') return items
+
+    items.push({
+      name,
+      url,
+      enabled: toBoolean(record.enabled, true),
+      requireAuth: toBoolean(record.requireAuth, false),
+    })
+    return items
+  }, [])
+}
+
 const cloneSidebarDefault = (): SidebarModulesAdminConfig =>
   Object.entries(SIDEBAR_MODULES_DEFAULT).reduce<SidebarModulesAdminConfig>(
     (acc, [section, config]) => {
@@ -146,6 +181,7 @@ export function parseHeaderNavModules(
       ...base,
       pricing: { ...base.pricing },
       rankings: { ...base.rankings },
+      custom: [],
     }
 
     Object.entries(parsed).forEach(([key, raw]) => {
@@ -155,6 +191,10 @@ export function parseHeaderNavModules(
       }
       if (key === 'rankings') {
         result.rankings = parseAccessModule(raw, base.rankings)
+        return
+      }
+      if (key === 'custom') {
+        result.custom = parseCustomItems(raw)
         return
       }
 

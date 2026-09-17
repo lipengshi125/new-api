@@ -409,6 +409,9 @@ const ModelRatioVisualEditorComponent = forwardRef<
         modelPriceUnit,
         { fallback: {}, silent: true }
       )
+      const customRatiosMap = safeJsonParse<
+        Record<string, Record<string, Record<string, number>>>
+      >(customRatios, { fallback: {}, silent: true })
 
       delete priceMap[name]
       delete ratioMap[name]
@@ -421,6 +424,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       delete billingModeMap[name]
       delete billingExprMap[name]
       delete priceUnitMap[name]
+      delete customRatiosMap[name]
 
       onChange('ModelPrice', JSON.stringify(priceMap, null, 2))
       onChange('ModelRatio', JSON.stringify(ratioMap, null, 2))
@@ -442,6 +446,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
         JSON.stringify(billingExprMap, null, 2)
       )
       onChange('ModelPriceUnit', JSON.stringify(priceUnitMap, null, 2))
+      onChange('CustomRatios', JSON.stringify(customRatiosMap, null, 2))
 
       if (editData?.name === name) {
         setEditData(null)
@@ -461,6 +466,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       billingMode,
       billingExpr,
       modelPriceUnit,
+      customRatios,
       onChange,
       editData,
     ]

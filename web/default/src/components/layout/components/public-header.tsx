@@ -142,6 +142,11 @@ export function PublicHeader(props: PublicHeaderProps) {
     navigate({ to: '/sign-in', search: { redirect } })
   }, [authPromptTarget?.href, navigate])
 
+  const navLinkTitle = useCallback(
+    (link: TopNavLink) => (link.translate === false ? link.title : t(link.title)),
+    [t]
+  )
+
   const handleNavLinkClick = useCallback(
     (
       event: React.MouseEvent<HTMLAnchorElement>,
@@ -160,7 +165,7 @@ export function PublicHeader(props: PublicHeaderProps) {
         }
         setAuthPromptSecondsLeft(AUTH_PROMPT_SECONDS)
         setAuthPromptTarget({
-          title: t(link.title),
+          title: navLinkTitle(link),
           href: link.href,
         })
         return
@@ -170,7 +175,7 @@ export function PublicHeader(props: PublicHeaderProps) {
         setMobileOpen(false)
       }
     },
-    [t]
+    [navLinkTitle]
   )
 
   return (
@@ -233,7 +238,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                         link.disabled && 'pointer-events-none opacity-50'
                       )}
                     >
-                      {t(link.title)}
+                      {navLinkTitle(link)}
                     </a>
                   )
                 }
@@ -251,7 +256,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                       link.disabled && 'pointer-events-none opacity-50'
                     )}
                   >
-                    {t(link.title)}
+                    {navLinkTitle(link)}
                   </Link>
                 )
               })}
@@ -374,7 +379,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                     className={linkClassName}
                     style={transitionStyle}
                   >
-                    {t(link.title)}
+                    {navLinkTitle(link)}
                   </a>
                 )
               }
@@ -387,7 +392,7 @@ export function PublicHeader(props: PublicHeaderProps) {
                   className={linkClassName}
                   style={transitionStyle}
                 >
-                  {t(link.title)}
+                  {navLinkTitle(link)}
                 </Link>
               )
             })}

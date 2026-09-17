@@ -19,6 +19,43 @@ For commercial licensing, please contact support@quantumnous.com
 
 import { useMemo } from 'react';
 
+// 管理员在「顶栏管理」中配置的自定义导航项：完整的 http(s) 地址在新标签页打开，
+// 其余一律视为站内路径。其他协议（javascript:、data: 等）直接丢弃，
+// 避免存储的配置把导航项变成脚本执行入口。
+const sanitizeCustomNavUrl = (raw) => {
+  if (typeof raw !== 'string') return '';
+  const trimmed = raw.trim();
+  if (trimmed === '') return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed) || trimmed.startsWith('//')) {
+    return '';
+  }
+  return `/${trimmed.replace(/^\/+/, '')}`;
+};
+
+const buildCustomNavLinks = (custom) => {
+  if (!Array.isArray(custom)) return [];
+
+  return custom.reduce((links, entry, index) => {
+    if (!entry || typeof entry !== 'object') return links;
+    if (entry.enabled === false) return links;
+
+    const name = typeof entry.name === 'string' ? entry.name.trim() : '';
+    const url = sanitizeCustomNavUrl(entry.url);
+    if (name === '' || url === '') return links;
+
+    const isExternal = /^https?:\/\//i.test(url);
+    links.push({
+      text: name,
+      itemKey: `custom-${index}`,
+      isCustom: true,
+      requireAuth: entry.requireAuth === true,
+      ...(isExternal ? { isExternal: true, externalLink: url } : { to: url }),
+    });
+    return links;
+  }, []);
+};
+
 export const useNavigation = (t, docsLink, headerNavModules) => {
   const mainNavLinks = useMemo(() => {
     // 默认配置，如果没有传入配置则显示所有模块
@@ -67,7 +104,7 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
     ];
 
     // 根据配置过滤导航链接
-    return allLinks.filter((link) => {
+    const enabledLinks = allLinks.filter((link) => {
       if (link.itemKey === 'docs') {
         return docsLink && modules.docs;
       }
@@ -79,6 +116,8 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
       }
       return modules[link.itemKey] === true;
     });
+
+    return [...enabledLinks, ...buildCustomNavLinks(modules.custom)];
   }, [t, docsLink, headerNavModules]);
 
   return {

@@ -20,7 +20,10 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useStatus } from '@/hooks/use-status'
-import { parseHeaderNavModulesFromStatus } from '@/lib/nav-modules'
+import {
+  isExternalNavUrl,
+  parseHeaderNavModulesFromStatus,
+} from '@/lib/nav-modules'
 import { useAuthStore } from '@/stores/auth-store'
 
 export type TopNavLink = {
@@ -29,6 +32,8 @@ export type TopNavLink = {
   disabled?: boolean
   requiresAuth?: boolean
   external?: boolean
+  /** Custom entries carry admin-authored titles that must not go through t(). */
+  translate?: boolean
 }
 
 /**
@@ -40,7 +45,9 @@ export type TopNavLink = {
  *   pricing: { enabled: true, requireAuth: false },
  *   rankings: { enabled: true, requireAuth: false },
  *   docs: true,
- *   about: true
+ *   about: true,
+ *   custom: [{ name: 'Help', url: 'https://help.example.com',
+ *              enabled: true, requireAuth: false }]
  * }
  */
 export function useTopNavLinks(): TopNavLink[] {
@@ -99,6 +106,18 @@ export function useTopNavLinks(): TopNavLink[] {
   if (modules?.about !== false) {
     links.push({ title: t('About'), href: '/about' })
   }
+
+  // Admin-defined custom entries, appended in configured order
+  modules.custom.forEach((item) => {
+    if (!item.enabled) return
+    links.push({
+      title: item.name,
+      href: item.url,
+      requiresAuth: item.requireAuth && !isAuthed,
+      external: isExternalNavUrl(item.url),
+      translate: false,
+    })
+  })
 
   return links
 }

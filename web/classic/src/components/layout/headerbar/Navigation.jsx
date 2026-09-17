@@ -39,7 +39,10 @@ const Navigation = ({
     return mainNavLinks.map((link) => {
       const linkContent = <span>{link.text}</span>;
 
-      if (link.isExternal) {
+      // 自定义导航项要求登录时，先经过登录页，外链也不例外
+      const needsLogin = link.isCustom && link.requireAuth && !userState.user;
+
+      if (link.isExternal && !needsLogin) {
         return (
           <a
             key={link.itemKey}
@@ -53,7 +56,7 @@ const Navigation = ({
         );
       }
 
-      let targetPath = link.to;
+      let targetPath = needsLogin ? '/login' : link.to;
       if (link.itemKey === 'console' && !userState.user) {
         targetPath = '/login';
       }

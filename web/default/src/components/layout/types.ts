@@ -97,6 +97,11 @@ export type TopNavLink = {
   disabled?: boolean
   requiresAuth?: boolean
   external?: boolean
+  /**
+   * `false` marks an admin-authored title that must be rendered verbatim
+   * instead of being passed through `t()`.
+   */
+  translate?: boolean
 }
 
 /**

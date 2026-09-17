@@ -481,9 +481,10 @@ export const ModelPricingEditorPanel = forwardRef<
         data.billingUnit = billingUnit
       }
 
-      if (Object.keys(customRatios).length > 0) {
-        data.customRatios = customRatios
-      }
+      // Always carry the map, including when it is empty: an empty object is how
+      // the editor expresses "the admin deleted every parameter row", and the
+      // persist step needs to see that to drop the model's stored entry.
+      data.customRatios = customRatios
 
       return data
     },

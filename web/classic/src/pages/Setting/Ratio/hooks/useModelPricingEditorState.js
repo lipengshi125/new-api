@@ -680,6 +680,10 @@ export function useModelPricingEditorState({
       AudioCompletionRatio: parseOptionJSON(options.AudioCompletionRatio),
       ModelBillingMode: parseOptionJSON(options['billing_setting.billing_mode']),
       ModelBillingExpr: parseOptionJSON(options['billing_setting.billing_expr']),
+      // 必须读取 CustomRatios：handleSubmit 会用当前 models 重建整张
+      // CustomRatios 表并整体 PUT，若这里不加载，每个模型都会得到 {}，
+      // 保存时反而把后端已存的自定义倍率清空。
+      CustomRatios: parseOptionJSON(options.CustomRatios),
     };
 
     const names = new Set([
@@ -696,6 +700,7 @@ export function useModelPricingEditorState({
       ...Object.keys(sourceMaps.AudioCompletionRatio),
       ...Object.keys(sourceMaps.ModelBillingMode),
       ...Object.keys(sourceMaps.ModelBillingExpr),
+      ...Object.keys(sourceMaps.CustomRatios),
     ]);
 
     const nextModels = Array.from(names)

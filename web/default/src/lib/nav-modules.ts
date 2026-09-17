@@ -17,10 +17,19 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { getStatus } from '@/lib/api'
+import { isHttpUrl } from '@/lib/content-format'
 
 export type ModuleAccess = { enabled: boolean; requireAuth: boolean }
 
 export type HeaderNavModule = 'rankings' | 'pricing'
+
+/** Admin-defined header entry: a display name plus the target it opens. */
+export type CustomNavItem = {
+  name: string
+  url: string
+  enabled: boolean
+  requireAuth: boolean
+}
 
 export type HeaderNavModules = {
   home: boolean
@@ -29,7 +38,8 @@ export type HeaderNavModules = {
   rankings: ModuleAccess
   docs: boolean
   about: boolean
-  [key: string]: boolean | ModuleAccess
+  custom: CustomNavItem[]
+  [key: string]: boolean | ModuleAccess | CustomNavItem[]
 }
 
 const DEFAULT_HEADER_NAV_MODULES: HeaderNavModules = {
@@ -39,6 +49,7 @@ const DEFAULT_HEADER_NAV_MODULES: HeaderNavModules = {
   rankings: { enabled: true, requireAuth: false },
   docs: true,
   about: true,
+  custom: [],
 }
 
 const DEFAULTS: Record<HeaderNavModule, ModuleAccess> = {
@@ -51,6 +62,7 @@ function cloneHeaderNavDefaults(): HeaderNavModules {
     ...DEFAULT_HEADER_NAV_MODULES,
     pricing: { ...DEFAULT_HEADER_NAV_MODULES.pricing },
     rankings: { ...DEFAULT_HEADER_NAV_MODULES.rankings },
+    custom: [],
   }
 }
 
@@ -70,6 +82,53 @@ export function parseHeaderNavBoolean(
     if (normalized === 'false' || normalized === '0') return false
   }
   return fallback
+}
+
+/**
+ * Normalize an admin-entered navigation target. Absolute `http(s)` URLs are
+ * kept as-is, everything else is treated as an in-app path and forced to start
+ * with a single `/`. Any other scheme (`javascript:`, `data:`, ...) is rejected
+ * so a stored config can never turn a header link into script execution.
+ */
+export function sanitizeNavUrl(raw: unknown): string {
+  if (typeof raw !== 'string') return ''
+  const trimmed = raw.trim()
+  if (trimmed === '') return ''
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return isHttpUrl(trimmed) ? trimmed : ''
+  }
+  // Reject any other explicit scheme, plus protocol-relative URLs.
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed) || trimmed.startsWith('//')) {
+    return ''
+  }
+
+  return `/${trimmed.replace(/^\/+/, '')}`
+}
+
+export function isExternalNavUrl(url: string): boolean {
+  return /^https?:\/\//i.test(url)
+}
+
+export function parseCustomNavItems(raw: unknown): CustomNavItem[] {
+  if (!Array.isArray(raw)) return []
+
+  return raw.reduce<CustomNavItem[]>((items, entry) => {
+    if (!entry || typeof entry !== 'object') return items
+
+    const record = entry as Record<string, unknown>
+    const name = typeof record.name === 'string' ? record.name.trim() : ''
+    const url = sanitizeNavUrl(record.url)
+    if (name === '' || url === '') return items
+
+    items.push({
+      name,
+      url,
+      enabled: parseHeaderNavBoolean(record.enabled, true),
+      requireAuth: parseHeaderNavBoolean(record.requireAuth, false),
+    })
+    return items
+  }, [])
 }
 
 function parseAccess(raw: unknown, fallback: ModuleAccess): ModuleAccess {
@@ -116,6 +175,10 @@ export function parseHeaderNavModules(raw: unknown): HeaderNavModules {
     }
     if (key === 'rankings') {
       result.rankings = parseAccess(value, result.rankings)
+      return
+    }
+    if (key === 'custom') {
+      result.custom = parseCustomNavItems(value)
       return
     }
 

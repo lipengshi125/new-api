@@ -109,8 +109,12 @@ export function R2StorageSettingsSection({
       } else {
         toast.error(response.data.message || t('Connection test failed'))
       }
-    } catch (error: any) {
-      toast.error(error.message || t('Failed to test R2 connection'))
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : t('Failed to test R2 connection')
+      )
     } finally {
       setIsTesting(false)
     }
