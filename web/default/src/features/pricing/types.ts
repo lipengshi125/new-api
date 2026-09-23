@@ -61,6 +61,12 @@ export type PricingModel = {
   /** Custom ratios: parameter name -> (parameter value -> ratio multiplier) */
   custom_ratios?: Record<string, Record<string, number>>
   /**
+   * Per-model call-sample overrides: endpoint type -> language -> code.
+   * Missing entries fall back to the site-wide templates, then to the
+   * built-in samples.
+   */
+  code_samples?: CodeSampleMap
+  /**
    * Optional model metadata fields reserved for backend-provided catalog data.
    * Keep them data-driven; do not synthesize display values on the client.
    */
@@ -92,6 +98,18 @@ export type ModelCapability =
   | 'caching'
   | 'embeddings'
 
+/** Languages the code-sample tabs offer. Mirrors the backend allow-list. */
+export type CodeSampleLang = 'curl' | 'python' | 'typescript' | 'javascript'
+
+/** Call samples keyed by endpoint type, then by language. */
+export type CodeSampleMap = Record<
+  string,
+  Partial<Record<CodeSampleLang, string>>
+>
+
+/** Where a rendered sample came from, shown to admins while editing. */
+export type CodeSampleSource = 'model' | 'global' | 'builtin'
+
 export type PricingData = {
   success: boolean
   message?: string
@@ -101,6 +119,8 @@ export type PricingData = {
   usable_group: Record<string, { desc: string; ratio: number }>
   supported_endpoint: Record<string, string>
   auto_groups: string[]
+  /** Site-wide call-sample templates, sent once rather than per model. */
+  code_sample_templates?: CodeSampleMap
 }
 
 export type TokenUnit = 'M' | 'K'

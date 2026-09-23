@@ -266,6 +266,38 @@ func ValidateMultipartDirect(c *gin.Context, info *RelayInfo) *dto.TaskError {
 	return nil
 }
 
+// ValidateImageTaskRequest validates an async image task submission
+// (POST /v1/images). Duration fields are irrelevant here, but `n` is a billing
+// multiplier and must be bounded by dto.MaxImageN before it can reach quota
+// calculation.
+func ValidateImageTaskRequest(c *gin.Context, info *RelayInfo) *dto.TaskError {
+	var req TaskSubmitReq
+	if err := common.UnmarshalBodyReusable(c, &req); err != nil {
+		return createTaskError(err, "invalid_json", http.StatusBadRequest, true)
+	}
+
+	if strings.TrimSpace(req.Model) == "" {
+		return createTaskError(fmt.Errorf("model field is required"), "missing_model", http.StatusBadRequest, true)
+	}
+	if taskErr := validatePrompt(req.Prompt); taskErr != nil {
+		return taskErr
+	}
+	if req.N != nil && (*req.N < 1 || *req.N > dto.MaxImageN) {
+		return createTaskError(fmt.Errorf("n must be an integer between 1 and %d", dto.MaxImageN), "invalid_n", http.StatusBadRequest, true)
+	}
+
+	if len(req.Images) == 0 {
+		if ref := strings.TrimSpace(req.InputReference); ref != "" {
+			req.Images = []string{ref}
+		} else if img := strings.TrimSpace(req.Image); img != "" {
+			req.Images = []string{img}
+		}
+	}
+
+	storeTaskRequest(c, info, constant.TaskActionImageGenerate, req)
+	return nil
+}
+
 func isKnownTaskField(field string) bool {
 	knownFields := map[string]bool{
 		"prompt":          true,
@@ -276,6 +308,7 @@ func isKnownTaskField(field string) bool {
 		"size":            true,
 		"duration":        true,
 		"input_reference": true, // Sora 特有字段
+		"n":               true, // 异步图片任务的生成张数
 	}
 	return knownFields[field]
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/setting/billing_setting"
+	"github.com/QuantumNous/new-api/setting/code_sample_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 )
@@ -38,6 +39,10 @@ type Pricing struct {
 	BillingExpr            string                        `json:"billing_expr,omitempty"`
 	BillingUnit            string                        `json:"billing_unit,omitempty"`
 	PricingVersion         string                        `json:"pricing_version,omitempty"`
+	// CodeSamples holds this model's call-sample overrides, keyed by endpoint
+	// type then language. Absent entries fall back to the global templates
+	// returned alongside the pricing payload, then to the built-in samples.
+	CodeSamples map[string]map[string]string `json:"code_samples,omitempty"`
 }
 
 type PricingVendor struct {
@@ -374,6 +379,7 @@ func updatePricing() {
 			pricing.Icon = meta.Icon
 			pricing.Tags = meta.Tags
 			pricing.VendorID = meta.VendorID
+			pricing.CodeSamples = parseModelCodeSamples(meta.CodeSamples)
 		}
 		modelPrice, findPrice := ratio_setting.GetModelPrice(model, false)
 		if findPrice {
@@ -436,4 +442,23 @@ func updatePricing() {
 // GetSupportedEndpointMap 返回全局端点到路径的映射
 func GetSupportedEndpointMap() map[string]common.EndpointInfo {
 	return supportedEndpointMap
+}
+
+// parseModelCodeSamples decodes the models.code_samples JSON blob. Stored rows
+// predate validation (and can be hand-edited in the database), so a malformed
+// or out-of-range blob yields no overrides instead of failing the whole pricing
+// refresh — the model then falls back to the global templates.
+func parseModelCodeSamples(raw string) map[string]map[string]string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	var parsed map[string]map[string]string
+	if err := common.UnmarshalJsonStr(raw, &parsed); err != nil {
+		return nil
+	}
+	normalized, err := code_sample_setting.Normalize(parsed)
+	if err != nil || len(normalized) == 0 {
+		return nil
+	}
+	return normalized
 }

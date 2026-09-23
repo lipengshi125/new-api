@@ -116,6 +116,11 @@ func SetRelayRouter(router *gin.Engine) {
 			controller.Relay(c, types.RelayFormatOpenAIImage)
 		})
 
+		// 异步图片任务：提交后轮询，形态与 /v1/videos 对齐。
+		// 上述 /images/generations、/images/edits 为同步端点，不受影响。
+		httpRouter.POST("/images", controller.RelayTask)
+		httpRouter.GET("/images/:task_id", controller.RelayTaskFetch)
+
 		// embedding related routes
 		httpRouter.POST("/embeddings", func(c *gin.Context) {
 			controller.Relay(c, types.RelayFormatEmbedding)

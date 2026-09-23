@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
 
-import type { PricingData } from './types'
+import type { CodeSampleMap, PricingData } from './types'
 
 // ----------------------------------------------------------------------------
 // Pricing APIs
@@ -27,5 +27,21 @@ import type { PricingData } from './types'
 // Get model pricing data
 export async function getPricing(): Promise<PricingData> {
   const res = await api.get('/api/pricing')
+  return res.data
+}
+
+/**
+ * Save a model's call-sample overrides. Keyed by model name rather than row id
+ * because non-exact name rules let one metadata row back many model names.
+ * An empty map clears the override.
+ */
+export async function updateModelCodeSamples(params: {
+  modelName: string
+  codeSamples: CodeSampleMap
+}): Promise<{ success: boolean; message?: string }> {
+  const res = await api.put('/api/models/code_samples', {
+    model_name: params.modelName,
+    code_samples: params.codeSamples,
+  })
   return res.data
 }

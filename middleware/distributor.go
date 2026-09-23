@@ -318,6 +318,29 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 			modelRequest.Model = getTaskOriginModelName(c)
 		}
 		c.Set("relay_mode", relayMode)
+	} else if isImageTaskPath(c.Request.URL.Path) {
+		// 异步图片任务：POST /v1/images 提交，GET /v1/images/{task_id} 查询。
+		// 形态与 /v1/videos 对齐。同步的 /v1/images/generations、/v1/images/edits
+		// 不属于此分支（见 isImageTaskPath）。
+		relayMode := relayconstant.RelayModeUnknown
+		if c.Request.Method == http.MethodPost {
+			relayMode = relayconstant.RelayModeImageTaskSubmit
+			req, err := getModelFromRequest(c)
+			if err != nil {
+				return nil, false, err
+			}
+			if req != nil {
+				modelRequest.Model = req.Model
+			}
+		} else if c.Request.Method == http.MethodGet {
+			relayMode = relayconstant.RelayModeImageTaskFetchByID
+			shouldSelectChannel = false
+			modelRequest.Model = getTaskOriginModelName(c)
+		}
+		// GetTaskPlatform 优先用渠道类型，那会把图片任务错配到该渠道的视频适配器，
+		// 因此这里显式指定平台。
+		c.Set("platform", string(constant.TaskPlatformImage))
+		c.Set("relay_mode", relayMode)
 	} else if strings.Contains(c.Request.URL.Path, "/v1/video/generations") {
 		relayMode := relayconstant.RelayModeUnknown
 		if c.Request.Method == http.MethodPost {
@@ -419,6 +442,26 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 // 当 token 启用「可用模型限制」时，下游 modelLimitEnable 校验会因
 // modelRequest.Model 为空而误报 "This token has no access to model"。
 // 从已存储的任务记录中回填 OriginModelName 即可让校验走在正确的模型上。
+// isImageTaskPath 判断路径是否为异步图片任务端点：
+// POST /v1/images 或 GET /v1/images/{task_id}。
+// 同步端点 /v1/images/generations、/v1/images/edits、/v1/images/variations
+// 必须排除，否则会被误当成 task 提交。
+func isImageTaskPath(path string) bool {
+	path = strings.TrimSuffix(path, "/")
+	if path == "/v1/images" {
+		return true
+	}
+	rest, ok := strings.CutPrefix(path, "/v1/images/")
+	if !ok || rest == "" || strings.Contains(rest, "/") {
+		return false
+	}
+	switch rest {
+	case "generations", "edits", "variations":
+		return false
+	}
+	return true
+}
+
 func getTaskOriginModelName(c *gin.Context) string {
 	if !common.GetContextKeyBool(c, constant.ContextKeyTokenModelLimitEnabled) {
 		return ""

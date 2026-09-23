@@ -9,6 +9,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/setting/code_sample_setting"
 
 	"github.com/gin-gonic/gin"
 )
@@ -151,6 +152,50 @@ func UpdateModelMeta(c *gin.Context) {
 	}
 	model.RefreshPricing()
 	common.ApiSuccess(c, &m)
+}
+
+// UpdateModelCodeSamples 更新指定模型的调用示例覆盖（按模型名定位）
+func UpdateModelCodeSamples(c *gin.Context) {
+	var req struct {
+		ModelName   string                       `json:"model_name"`
+		CodeSamples map[string]map[string]string `json:"code_samples"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if strings.TrimSpace(req.ModelName) == "" {
+		common.ApiErrorMsg(c, "模型名称不能为空")
+		return
+	}
+
+	normalized, err := code_sample_setting.Normalize(req.CodeSamples)
+	if err != nil {
+		common.ApiErrorMsg(c, err.Error())
+		return
+	}
+
+	// An empty map clears the override so the model falls back to the global
+	// templates; store "" rather than "{}" to keep that intent explicit.
+	serialized := ""
+	if len(normalized) > 0 {
+		encoded, err := common.Marshal(normalized)
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		serialized = string(encoded)
+	}
+
+	if err := model.UpsertModelCodeSamples(req.ModelName, serialized); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	model.RefreshPricing()
+	common.ApiSuccess(c, gin.H{
+		"model_name":   req.ModelName,
+		"code_samples": normalized,
+	})
 }
 
 // DeleteModelMeta 删除模型

@@ -70,6 +70,7 @@ import { parseTags } from '../lib/filters'
 import { getAvailableGroups, isTokenBasedModel } from '../lib/model-helpers'
 import { formatFixedPrice, formatGroupPrice } from '../lib/price'
 import type {
+  CodeSampleMap,
   ModelCapability,
   PriceType,
   PricingModel,
@@ -1192,6 +1193,7 @@ export interface ModelDetailsContentProps {
   groupRatio: Record<string, number>
   usableGroup: Record<string, { desc: string; ratio: number }>
   endpointMap: Record<string, { path?: string; method?: string }>
+  codeSampleTemplates?: CodeSampleMap
   autoGroups: string[]
   priceRate: number
   usdExchangeRate: number
@@ -1270,6 +1272,7 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
           <ModelDetailsApi
             model={props.model}
             endpointMap={props.endpointMap}
+            codeSampleTemplates={props.codeSampleTemplates}
           />
         </TabsContent>
       </Tabs>
@@ -1321,6 +1324,7 @@ export function ModelDetails() {
     groupRatio,
     usableGroup,
     endpointMap,
+    codeSampleTemplates,
     autoGroups,
     isLoading,
     priceRate,
@@ -1410,6 +1414,7 @@ export function ModelDetails() {
               { path?: string; method?: string }
             >) || {}
           }
+          codeSampleTemplates={codeSampleTemplates}
         />
       </div>
     </PublicLayout>

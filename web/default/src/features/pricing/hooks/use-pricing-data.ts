@@ -69,6 +69,7 @@ export function usePricingData() {
     usableGroup: data?.usable_group ?? {},
     endpointMap: data?.supported_endpoint ?? {},
     autoGroups: data?.auto_groups ?? [],
+    codeSampleTemplates: data?.code_sample_templates ?? {},
     isLoading,
     error,
     refetch,

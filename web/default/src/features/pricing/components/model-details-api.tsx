@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Gauge,
   KeyRound,
+  Pencil,
   ScrollText,
   Sigma,
   Zap,
@@ -37,9 +38,12 @@ import {
   staticDataTableClassNames as tableStyles,
 } from '@/components/data-table'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useIsAdmin } from '@/hooks/use-admin'
 import { useStatus } from '@/hooks/use-status'
 
+import { resolveCodeSample } from '../lib/code-samples'
 import {
   buildRateLimits,
   buildSupportedParameters,
@@ -47,7 +51,11 @@ import {
   type SupportedParameter,
 } from '../lib/mock-stats'
 import { replaceModelInPath } from '../lib/model-helpers'
-import type { PricingModel } from '../types'
+import type { CodeSampleMap, PricingModel } from '../types'
+import {
+  CodeSampleEditor,
+  CodeSampleSourceBadge,
+} from './model-details-api-editor'
 
 // ---------------------------------------------------------------------------
 // Code-sample registry
@@ -443,9 +451,12 @@ function buildSample(
 function CodeSamplesSection(props: {
   model: PricingModel
   endpointMap: Record<string, { path?: string; method?: string }>
+  globalTemplates?: CodeSampleMap
 }) {
   const { t } = useTranslation()
   const { status } = useStatus()
+  const isAdmin = useIsAdmin()
+  const [isEditing, setIsEditing] = useState(false)
 
   const baseUrl = useMemo(() => {
     const candidate =
@@ -487,21 +498,55 @@ function CodeSamplesSection(props: {
     return null
   }
 
-  const code = buildSample(lang, activeEndpoint.type, {
+  const builtin = buildSample(lang, activeEndpoint.type, {
     baseUrl,
     apiKeyEnv: 'NEW_API_KEY',
     modelName: props.model.model_name || '',
     endpointType: activeEndpoint.type,
     endpointPath: activeEndpoint.path,
   })
+  const resolved = resolveCodeSample({
+    lang,
+    endpointType: activeEndpoint.type,
+    modelSamples: props.model.code_samples,
+    globalTemplates: props.globalTemplates,
+    builtin,
+  })
+
+  const switchSample = (apply: () => void) => {
+    setIsEditing(false)
+    apply()
+  }
 
   return (
     <section>
-      <SectionTitle icon={ScrollText}>{t('Code samples')}</SectionTitle>
+      <div className='mb-3 flex items-center justify-between gap-2'>
+        <h3 className='text-foreground flex items-center gap-1.5 text-sm font-semibold'>
+          <ScrollText className='text-muted-foreground/70 size-3.5' />
+          {t('Code samples')}
+        </h3>
+        <div className='flex items-center gap-1.5'>
+          {isAdmin && <CodeSampleSourceBadge source={resolved.source} />}
+          {isAdmin && !isEditing && (
+            <Button
+              size='sm'
+              variant='ghost'
+              className='text-muted-foreground h-7 gap-1 px-2 text-xs'
+              onClick={() => setIsEditing(true)}
+            >
+              <Pencil className='size-3.5' />
+              {t('Edit')}
+            </Button>
+          )}
+        </div>
+      </div>
 
       <div className='flex flex-wrap items-center gap-2'>
         {endpoints.length > 1 && (
-          <Tabs value={endpointType} onValueChange={setEndpointType}>
+          <Tabs
+            value={endpointType}
+            onValueChange={(v) => switchSample(() => setEndpointType(v))}
+          >
             <TabsList className='bg-muted/40 h-8 p-0.5'>
               {endpoints.map((ep) => (
                 <TabsTrigger
@@ -518,7 +563,7 @@ function CodeSamplesSection(props: {
 
         <Tabs
           value={lang}
-          onValueChange={(v) => setLang(v as Lang)}
+          onValueChange={(v) => switchSample(() => setLang(v as Lang))}
           className='ml-auto'
         >
           <TabsList className='bg-muted/40 h-8 p-0.5'>
@@ -532,18 +577,33 @@ function CodeSamplesSection(props: {
       </div>
 
       <div className='mt-3'>
-        <CodeBlock code={code} language={LANG_HIGHLIGHT[lang]}>
-          <CodeBlockCopyButton />
-        </CodeBlock>
+        {isEditing ? (
+          <CodeSampleEditor
+            key={`${activeEndpoint.type}:${lang}`}
+            modelName={props.model.model_name || ''}
+            endpointType={activeEndpoint.type}
+            lang={lang}
+            initialCode={resolved.code}
+            hasOverride={resolved.source === 'model'}
+            modelSamples={props.model.code_samples}
+            onClose={() => setIsEditing(false)}
+          />
+        ) : (
+          <CodeBlock code={resolved.code} language={LANG_HIGHLIGHT[lang]}>
+            <CodeBlockCopyButton />
+          </CodeBlock>
+        )}
       </div>
 
-      <p className='text-muted-foreground mt-2 text-xs'>
-        {t('Replace')}{' '}
-        <code className='bg-muted rounded px-1 py-0.5 font-mono text-[11px]'>
-          {'<YOUR_API_KEY>'}
-        </code>{' '}
-        {t('with the API key from your token settings.')}
-      </p>
+      {!isEditing && (
+        <p className='text-muted-foreground mt-2 text-xs'>
+          {t('Replace')}{' '}
+          <code className='bg-muted rounded px-1 py-0.5 font-mono text-[11px]'>
+            {'<YOUR_API_KEY>'}
+          </code>{' '}
+          {t('with the API key from your token settings.')}
+        </p>
+      )}
     </section>
   )
 }
@@ -761,10 +821,15 @@ function AuthSection() {
 export function ModelDetailsApi(props: {
   model: PricingModel
   endpointMap: Record<string, { path?: string; method?: string }>
+  codeSampleTemplates?: CodeSampleMap
 }) {
   return (
     <div className='space-y-6'>
-      <CodeSamplesSection model={props.model} endpointMap={props.endpointMap} />
+      <CodeSamplesSection
+        model={props.model}
+        endpointMap={props.endpointMap}
+        globalTemplates={props.codeSampleTemplates}
+      />
       <AuthSection />
       <SupportedParametersSection model={props.model} />
       <RateLimitsSection model={props.model} />

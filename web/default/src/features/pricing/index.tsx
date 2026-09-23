@@ -48,6 +48,7 @@ export function Pricing() {
     groupRatio,
     usableGroup,
     endpointMap,
+    codeSampleTemplates,
     autoGroups,
     isLoading,
     priceRate,
@@ -275,6 +276,7 @@ export function Pricing() {
                   { path?: string; method?: string }
                 >) || {}
               }
+              codeSampleTemplates={codeSampleTemplates}
               autoGroups={autoGroups || []}
               priceRate={priceRate ?? 1}
               usdExchangeRate={usdExchangeRate ?? 1}

@@ -700,6 +700,10 @@ type TaskSubmitReq struct {
 	ModeType       string                 `json:"modeType,omitempty"`
 	Ratio          string                 `json:"ratio,omitempty"`
 	Metadata       map[string]interface{} `json:"metadata,omitempty"`
+	// N is the image count for async image tasks. Pointer so an absent field
+	// stays nil; it is a billing multiplier and is bounded by dto.MaxImageN in
+	// ValidateImageTaskRequest.
+	N *uint `json:"n,omitempty"`
 }
 
 func (t *TaskSubmitReq) GetPrompt() string {

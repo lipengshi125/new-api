@@ -1,0 +1,6 @@
+{
+  "Failed to save code sample": "Failed to save code sample",
+  "Parameter name can only contain letters, numbers, underscores and hyphens": "Parameter name can only contain letters, numbers, underscores and hyphens",
+  "This parameter value already exists and will override the previous configuration": "This parameter value already exists and will override the previous configuration",
+  "Saved samples are shown verbatim to everyone who can view this page. Do not include real API keys.": "Saved samples are shown verbatim to everyone who can view this page. Do not include real API keys."
+}
