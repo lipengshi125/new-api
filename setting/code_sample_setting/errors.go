@@ -7,6 +7,8 @@ const (
 	ReasonUnknownEndpointType = "unknown_endpoint_type"
 	ReasonUnknownLanguage     = "unknown_language"
 	ReasonTooLarge            = "too_large"
+	ReasonMissingModelName    = "missing_model_name"
+	ReasonTooManyModels       = "too_many_models"
 )
 
 // ValidationError describes why a code-sample payload was rejected. Callers
@@ -25,6 +27,10 @@ func (e *ValidationError) Error() string {
 		return fmt.Sprintf("unsupported language %q for endpoint type %s", e.Language, e.EndpointType)
 	case ReasonTooLarge:
 		return fmt.Sprintf("code sample for %s/%s exceeds %d bytes", e.EndpointType, e.Language, MaxTemplateBytes)
+	case ReasonMissingModelName:
+		return "模型名称不能为空"
+	case ReasonTooManyModels:
+		return fmt.Sprintf("已达到 %d 个模型的调用示例上限", MaxModelOverrides)
 	default:
 		return "invalid code sample payload"
 	}

@@ -388,6 +388,7 @@ function TaskLogsCard<TData>({
       </div>
 
       <div className='grid grid-cols-2 gap-1.5'>
+        <SummaryField label={t('Model')} cell={cells.get('model_name')} />
         <SummaryField label={t('Submit Time')} cell={submitTimeCell} />
         <SummaryField label={t('User')} cell={cells.get('user')} primaryOnly />
         <SummaryField

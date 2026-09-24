@@ -67,6 +67,8 @@ export interface DrawingLogFilters extends CommonFilters {
  */
 export interface TaskLogFilters extends CommonFilters {
   taskId?: string
+  model?: string
+  token?: string
 }
 
 /**
@@ -276,6 +278,16 @@ export interface MidjourneyLog {
 // Task Logs Types
 // ============================================================================
 
+/**
+ * Task properties persisted by the backend (`model.Properties`).
+ * Serialized as `null` when empty, so every field is optional.
+ */
+export interface TaskProperties {
+  input?: string
+  origin_model_name?: string
+  upstream_model_name?: string
+}
+
 export interface TaskLog {
   id: number
   user_id: number
@@ -284,6 +296,9 @@ export interface TaskLog {
   platform: string
   task_id: string
   action: string
+  properties?: TaskProperties | null
+  /** 可筛选的存储列；历史任务回填前可能为空，此时回退到 properties */
+  model_name?: string
   channel_id: number
   submit_time: number // seconds
   finish_time?: number // seconds
@@ -369,6 +384,8 @@ export interface GetTaskLogsParams {
   page_size?: number
   channel_id?: string
   task_id?: string
+  model_name?: string
+  token_name?: string
   start_timestamp?: number
   end_timestamp?: number
 }

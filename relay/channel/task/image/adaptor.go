@@ -142,14 +142,24 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 		return
 	}
 
-	out := dto.NewOpenAIImageTask()
+	// 返回 OpenAI video 格式：图片与视频任务共用一套响应结构，
+	// 客户端可以用同一段轮询逻辑处理两者。
+	out := dto.NewOpenAIVideo()
 	out.ID = info.PublicTaskID
+	out.TaskID = info.PublicTaskID
 	out.Model = info.OriginModelName
 	out.Progress = parsed.Progress
 	out.CreatedAt = parsed.CreatedAt
 	out.Size = parsed.Size
-	if status := mapUpstreamStatus(parsed.Status); status != "" {
-		out.Status = status
+	switch mapUpstreamStatus(parsed.Status) {
+	case dto.VideoStatusInProgress:
+		out.Status = dto.VideoStatusInProgress
+	case dto.VideoStatusCompleted:
+		out.Status = dto.VideoStatusCompleted
+	case dto.VideoStatusFailed:
+		out.Status = dto.VideoStatusFailed
+	default:
+		out.Status = dto.VideoStatusQueued
 	}
 	c.JSON(http.StatusOK, out)
 
@@ -191,12 +201,12 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 
 	info := &relaycommon.TaskInfo{Code: 0}
 	switch mapUpstreamStatus(parsed.Status) {
-	case dto.ImageTaskStatusQueued:
+	case dto.VideoStatusQueued:
 		info.Status = model.TaskStatusQueued
-	case dto.ImageTaskStatusCompleted:
+	case dto.VideoStatusCompleted:
 		info.Status = model.TaskStatusSuccess
 		info.Url = firstImageURL(parsed.Data)
-	case dto.ImageTaskStatusFailed:
+	case dto.VideoStatusFailed:
 		info.Status = model.TaskStatusFailure
 		if parsed.Error != nil && parsed.Error.Message != "" {
 			info.Reason = parsed.Error.Message
@@ -213,37 +223,54 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 	return info, nil
 }
 
-// ConvertToOpenAIImageTask renders a stored task for GET /v1/images/{id}.
-func (a *TaskAdaptor) ConvertToOpenAIImageTask(task *model.Task) ([]byte, error) {
-	out := dto.NewOpenAIImageTask()
+// ConvertToOpenAIVideo renders a stored image task in the OpenAI video shape.
+// Image and video tasks share one response format so /v1/videos/{id} and
+// /v1/images/{id} are interchangeable aliases for the same query endpoint.
+// The result URL is carried in metadata.url, matching every other adaptor.
+func (a *TaskAdaptor) ConvertToOpenAIVideo(task *model.Task) ([]byte, error) {
+	out := dto.NewOpenAIVideo()
 	out.ID = task.TaskID
+	out.TaskID = task.TaskID
 	out.Model = task.Properties.OriginModelName
-	out.Status = task.Status.ToImageTaskStatus()
-	out.CreatedAt = task.SubmitTime
-	out.Progress = parseProgress(task.Progress)
-
-	if task.Status == model.TaskStatusSuccess {
+	out.Status = task.Status.ToVideoStatus()
+	out.SetProgressStr(task.Progress)
+	out.CreatedAt = task.CreatedAt
+	if task.FinishTime > 0 {
 		out.CompletedAt = task.FinishTime
-		// Prefer the image list the upstream reported; fall back to the single
-		// stored result URL when the payload is unavailable or unparseable.
-		var stored submitResponse
-		if err := common.Unmarshal(task.Data, &stored); err == nil && len(stored.Data) > 0 {
+	} else if task.UpdatedAt > 0 {
+		out.CompletedAt = task.UpdatedAt
+	}
+
+	// Prefer the first image URL the upstream reported; fall back to the stored
+	// result URL when the payload is unavailable or unparseable.
+	var stored submitResponse
+	if err := common.Unmarshal(task.Data, &stored); err == nil {
+		if stored.Size != "" {
 			out.Size = stored.Size
+		}
+		if url := firstImageURL(stored.Data); url != "" {
+			out.SetMetadata("url", url)
+		}
+		if len(stored.Data) > 1 {
+			urls := make([]string, 0, len(stored.Data))
 			for _, d := range stored.Data {
-				out.Data = append(out.Data, dto.OpenAIImageTaskDatum{
-					URL:           d.URL,
-					B64JSON:       d.B64JSON,
-					RevisedPrompt: d.RevisedPrompt,
-				})
+				if d.URL != "" {
+					urls = append(urls, d.URL)
+				}
 			}
-		} else if url := task.GetResultURL(); url != "" {
-			out.Data = []dto.OpenAIImageTaskDatum{{URL: url}}
+			if len(urls) > 1 {
+				out.SetMetadata("urls", urls)
+			}
+		}
+	}
+	if _, ok := out.Metadata["url"]; !ok {
+		if url := task.GetResultURL(); url != "" {
+			out.SetMetadata("url", url)
 		}
 	}
 
 	if task.Status == model.TaskStatusFailure {
-		out.CompletedAt = task.FinishTime
-		out.Error = &dto.OpenAIImageTaskError{
+		out.Error = &dto.OpenAIVideoError{
 			Message: task.FailReason,
 			Code:    "task_failed",
 		}
@@ -252,18 +279,19 @@ func (a *TaskAdaptor) ConvertToOpenAIImageTask(task *model.Task) ([]byte, error)
 	return common.Marshal(out)
 }
 
-// mapUpstreamStatus normalizes the status spellings seen across upstreams.
-// An empty result means "unrecognized" and callers keep polling.
+// mapUpstreamStatus normalizes the status spellings seen across upstreams onto
+// the OpenAI video status vocabulary. An empty result means "unrecognized" and
+// callers keep polling rather than failing a task that is still running.
 func mapUpstreamStatus(status string) string {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "queued", "pending", "not_start", "submitted":
-		return dto.ImageTaskStatusQueued
+		return dto.VideoStatusQueued
 	case "processing", "in_progress", "running":
-		return dto.ImageTaskStatusInProgress
+		return dto.VideoStatusInProgress
 	case "completed", "succeeded", "success":
-		return dto.ImageTaskStatusCompleted
+		return dto.VideoStatusCompleted
 	case "failed", "failure", "cancelled", "canceled", "error":
-		return dto.ImageTaskStatusFailed
+		return dto.VideoStatusFailed
 	}
 	return ""
 }
@@ -275,22 +303,4 @@ func firstImageURL(data []datum) string {
 		}
 	}
 	return ""
-}
-
-func parseProgress(progress string) int {
-	trimmed := strings.TrimSuffix(strings.TrimSpace(progress), "%")
-	if trimmed == "" {
-		return 0
-	}
-	var value int
-	if _, err := fmt.Sscanf(trimmed, "%d", &value); err != nil {
-		return 0
-	}
-	if value < 0 {
-		return 0
-	}
-	if value > 100 {
-		return 100
-	}
-	return value
 }

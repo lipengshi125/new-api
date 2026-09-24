@@ -31,21 +31,6 @@ func (t TaskStatus) ToVideoStatus() string {
 	return status
 }
 
-func (t TaskStatus) ToImageTaskStatus() string {
-	switch t {
-	case TaskStatusNotStart, TaskStatusQueued, TaskStatusSubmitted:
-		return dto.ImageTaskStatusQueued
-	case TaskStatusInProgress:
-		return dto.ImageTaskStatusInProgress
-	case TaskStatusSuccess:
-		return dto.ImageTaskStatusCompleted
-	case TaskStatusFailure:
-		return dto.ImageTaskStatusFailed
-	default:
-		return dto.ImageTaskStatusQueued
-	}
-}
-
 const (
 	TaskStatusNotStart   TaskStatus = "NOT_START"
 	TaskStatusSubmitted             = "SUBMITTED"

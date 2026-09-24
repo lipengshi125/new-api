@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
@@ -312,6 +313,7 @@ func migrateDB() error {
 			return err
 		}
 	}
+	backfillTaskModelAndTokenNames()
 	return nil
 }
 
@@ -384,6 +386,7 @@ func migrateDBFast() error {
 			return err
 		}
 	}
+	backfillTaskModelAndTokenNames()
 	common.SysLog("database migrated")
 	return nil
 }
@@ -679,6 +682,86 @@ func migrateSubscriptionPlanPriceAmount() {
 			common.SysLog(fmt.Sprintf("Successfully migrated %s.%s to decimal(10,6)", tableName, columnName))
 		}
 	}
+}
+
+// taskNameBackfillOptionKey 标记 tasks.model_name / tasks.token_name 回填已完成。
+// 回填对无法恢复名字的历史行会留下空值，没有这个标记就无法区分“未回填”和
+// “回填过但确实没有名字”，每次重启都会重新全表扫描。
+const taskNameBackfillOptionKey = "TaskModelTokenNameBackfilled"
+
+// backfillTaskModelAndTokenNames 把历史任务的模型名与令牌名从 JSON 列
+// (properties / private_data) 提升到新增的可索引列，使任务日志能按模型/令牌筛选。
+// 用 Go 逐批读写而非方言相关的 JSON SQL，因此在 SQLite/MySQL/PostgreSQL 上行为一致。
+// 幂等：可重复运行，完成后写入 Option 标记跳过后续扫描。
+func backfillTaskModelAndTokenNames() {
+	if !DB.Migrator().HasTable(&Task{}) {
+		return
+	}
+	var marker Option
+	if err := DB.Where("`key` = ?", taskNameBackfillOptionKey).First(&marker).Error; err == nil {
+		return
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		// 读标记失败时不要贸然全表扫描，下次启动再试
+		common.SysLog(fmt.Sprintf("Warning: failed to read %s marker: %v", taskNameBackfillOptionKey, err))
+		return
+	}
+
+	const batchSize = 500
+	tokenNames := make(map[int]string)
+	var lastID int64
+	updated := 0
+	for {
+		var tasks []*Task
+		if err := DB.Where("id > ?", lastID).Order("id").Limit(batchSize).Find(&tasks).Error; err != nil {
+			common.SysLog(fmt.Sprintf("Warning: task name backfill aborted while reading: %v", err))
+			return
+		}
+		if len(tasks) == 0 {
+			break
+		}
+		for _, task := range tasks {
+			lastID = task.ID
+			updates := make(map[string]any, 2)
+			if task.ModelName == "" {
+				if name := task.Properties.OriginModelName; name != "" {
+					updates["model_name"] = name
+				} else if name := task.Properties.UpstreamModelName; name != "" {
+					updates["model_name"] = name
+				}
+			}
+			if task.TokenName == "" && task.PrivateData.TokenId > 0 {
+				tokenID := task.PrivateData.TokenId
+				name, ok := tokenNames[tokenID]
+				if !ok {
+					// 令牌可能已被删除，记录空值避免对同一 ID 重复查询
+					if token, err := GetTokenById(tokenID); err == nil && token != nil {
+						name = token.Name
+					}
+					tokenNames[tokenID] = name
+				}
+				if name != "" {
+					updates["token_name"] = name
+				}
+			}
+			if len(updates) == 0 {
+				continue
+			}
+			if err := DB.Model(&Task{}).Where("id = ?", task.ID).Updates(updates).Error; err != nil {
+				common.SysLog(fmt.Sprintf("Warning: task name backfill failed for task %d: %v", task.ID, err))
+				return
+			}
+			updated++
+		}
+		if len(tasks) < batchSize {
+			break
+		}
+	}
+
+	if err := DB.Create(&Option{Key: taskNameBackfillOptionKey, Value: "true"}).Error; err != nil {
+		common.SysLog(fmt.Sprintf("Warning: failed to persist %s marker: %v", taskNameBackfillOptionKey, err))
+		return
+	}
+	common.SysLog(fmt.Sprintf("task model/token name backfill completed, %d rows updated", updated))
 }
 
 func closeDB(db *gorm.DB) error {

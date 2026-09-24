@@ -302,10 +302,11 @@ func noteTaskQuotaClamp(info *relaycommon.RelayInfo, clamp *common.QuotaClamp) {
 }
 
 var fetchRespBuilders = map[int]func(c *gin.Context) (respBody []byte, taskResp *dto.TaskError){
-	relayconstant.RelayModeSunoFetchByID:      sunoFetchByIDRespBodyBuilder,
-	relayconstant.RelayModeSunoFetch:          sunoFetchRespBodyBuilder,
-	relayconstant.RelayModeVideoFetchByID:     videoFetchByIDRespBodyBuilder,
-	relayconstant.RelayModeImageTaskFetchByID: imageTaskFetchByIDRespBodyBuilder,
+	relayconstant.RelayModeSunoFetchByID:  sunoFetchByIDRespBodyBuilder,
+	relayconstant.RelayModeSunoFetch:      sunoFetchRespBodyBuilder,
+	relayconstant.RelayModeVideoFetchByID: videoFetchByIDRespBodyBuilder,
+	// 图片任务查询复用 video 的 builder：两个端点互为别名，返回同一格式。
+	relayconstant.RelayModeImageTaskFetchByID: videoFetchByIDRespBodyBuilder,
 }
 
 func RelayTaskFetch(c *gin.Context, relayMode int) (taskResp *dto.TaskError) {
@@ -400,7 +401,10 @@ func videoFetchByIDRespBodyBuilder(c *gin.Context) (respBody []byte, taskResp *d
 		return
 	}
 
-	isOpenAIVideoAPI := strings.HasPrefix(c.Request.RequestURI, "/v1/videos/")
+	// /v1/videos/{id} 与 /v1/images/{id} 是同一个查询端点的两个别名：
+	// 任一路径都能查任一任务，且都返回 OpenAI video 格式。
+	isOpenAIVideoAPI := strings.HasPrefix(c.Request.RequestURI, "/v1/videos/") ||
+		strings.HasPrefix(c.Request.RequestURI, "/v1/images/")
 
 	// Gemini/Vertex 支持实时查询：用户 fetch 时直接从上游拉取最新状态
 	if realtimeResp := tryRealtimeFetch(originTask, isOpenAIVideoAPI); len(realtimeResp) > 0 {
@@ -429,46 +433,6 @@ func videoFetchByIDRespBodyBuilder(c *gin.Context) (respBody []byte, taskResp *d
 	}
 
 	// 通用 TaskDto 格式
-	respBody, err = common.Marshal(dto.TaskResponse[any]{
-		Code: "success",
-		Data: TaskModel2Dto(originTask),
-	})
-	if err != nil {
-		taskResp = service.TaskErrorWrapper(err, "marshal_response_failed", http.StatusInternalServerError)
-	}
-	return
-}
-
-// imageTaskFetchByIDRespBodyBuilder 处理 GET /v1/images/{task_id}。
-// 与 videoFetchByIDRespBodyBuilder 对称：优先交由适配器转换成异步图片响应格式，
-// 适配器未实现时回退到通用 TaskDto 格式。
-func imageTaskFetchByIDRespBodyBuilder(c *gin.Context) (respBody []byte, taskResp *dto.TaskError) {
-	taskId := c.Param("task_id")
-	if taskId == "" {
-		taskId = c.GetString("task_id")
-	}
-	userId := c.GetInt("id")
-
-	originTask, exist, err := model.GetByTaskId(userId, taskId)
-	if err != nil {
-		taskResp = service.TaskErrorWrapper(err, "get_task_failed", http.StatusInternalServerError)
-		return
-	}
-	if !exist {
-		taskResp = service.TaskErrorWrapperLocal(errors.New("task_not_exist"), "task_not_exist", http.StatusBadRequest)
-		return
-	}
-
-	if adaptor := GetTaskAdaptor(originTask.Platform); adaptor != nil {
-		if converter, ok := adaptor.(channel.OpenAIImageTaskConverter); ok {
-			respBody, err = converter.ConvertToOpenAIImageTask(originTask)
-			if err != nil {
-				taskResp = service.TaskErrorWrapper(err, "convert_to_openai_image_failed", http.StatusInternalServerError)
-			}
-			return
-		}
-	}
-
 	respBody, err = common.Marshal(dto.TaskResponse[any]{
 		Code: "success",
 		Data: TaskModel2Dto(originTask),

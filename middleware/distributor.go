@@ -332,14 +332,17 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 			if req != nil {
 				modelRequest.Model = req.Model
 			}
+			// 提交时才锁定图片平台：GetTaskPlatform 优先用渠道类型，
+			// 那会把图片任务错配到该渠道的视频适配器。
+			c.Set("platform", string(constant.TaskPlatformImage))
 		} else if c.Request.Method == http.MethodGet {
+			// 查询不指定平台：/v1/images/{id} 与 /v1/videos/{id} 互为别名，
+			// 平台由任务记录自身决定（见 videoFetchByIDRespBodyBuilder），
+			// 这样用图片路径查视频任务也能命中正确的适配器。
 			relayMode = relayconstant.RelayModeImageTaskFetchByID
 			shouldSelectChannel = false
 			modelRequest.Model = getTaskOriginModelName(c)
 		}
-		// GetTaskPlatform 优先用渠道类型，那会把图片任务错配到该渠道的视频适配器，
-		// 因此这里显式指定平台。
-		c.Set("platform", string(constant.TaskPlatformImage))
 		c.Set("relay_mode", relayMode)
 	} else if strings.Contains(c.Request.URL.Path, "/v1/video/generations") {
 		relayMode := relayconstant.RelayModeUnknown

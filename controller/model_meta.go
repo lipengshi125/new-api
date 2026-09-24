@@ -169,32 +169,28 @@ func UpdateModelCodeSamples(c *gin.Context) {
 		return
 	}
 
-	normalized, err := code_sample_setting.Normalize(req.CodeSamples)
+	// Samples are stored in the options table, keyed by model name. They are
+	// deliberately not written to the models row: a sample is presentation, not
+	// model metadata, so saving one must never create or modify a 元信息 entry.
+	next, err := code_sample_setting.BuildModelSamplesUpdate(req.ModelName, req.CodeSamples)
 	if err != nil {
 		common.ApiErrorMsg(c, err.Error())
 		return
 	}
 
-	// An empty map clears the override so the model falls back to the global
-	// templates; store "" rather than "{}" to keep that intent explicit.
-	serialized := ""
-	if len(normalized) > 0 {
-		encoded, err := common.Marshal(normalized)
-		if err != nil {
-			common.ApiError(c, err)
-			return
-		}
-		serialized = string(encoded)
-	}
-
-	if err := model.UpsertModelCodeSamples(req.ModelName, serialized); err != nil {
+	encoded, err := common.Marshal(next)
+	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
-	model.RefreshPricing()
+	if err := model.UpdateOption("code_sample_setting.models", string(encoded)); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
 	common.ApiSuccess(c, gin.H{
-		"model_name":   req.ModelName,
-		"code_samples": normalized,
+		"model_name":   strings.TrimSpace(req.ModelName),
+		"code_samples": next[strings.TrimSpace(req.ModelName)],
 	})
 }
 

@@ -86,39 +86,53 @@ func TestParseTaskResultStatusMapping(t *testing.T) {
 	}
 }
 
-// TestConvertToOpenAIImageTask verifies GET /v1/images/{id} reports the public
-// task id (never the upstream id) and surfaces the stored image list.
-func TestConvertToOpenAIImageTask(t *testing.T) {
+// TestConvertToOpenAIVideo verifies an image task renders in the OpenAI video
+// shape, so /v1/images/{id} and /v1/videos/{id} return one interchangeable
+// format. It also pins that the upstream id never leaks to the client.
+func TestConvertToOpenAIVideo(t *testing.T) {
 	adaptor := &TaskAdaptor{}
 
-	t.Run("success exposes public id and images", func(t *testing.T) {
+	t.Run("success exposes public id and result url in metadata", func(t *testing.T) {
 		task := &model.Task{
 			TaskID:     "task_public123",
 			Status:     model.TaskStatusSuccess,
 			Progress:   "100%",
-			SubmitTime: 1000,
+			CreatedAt:  1000,
 			FinishTime: 1200,
-			Data:       json.RawMessage(`{"id":"upstream_secret","size":"1024x1024","data":[{"url":"https://cdn.example.com/a.png","revised_prompt":"a green cat"},{"b64_json":"aGk="}]}`),
+			Data:       json.RawMessage(`{"id":"upstream_secret","size":"1024x1024","data":[{"url":"https://cdn.example.com/a.png"}]}`),
 		}
 		task.Properties.OriginModelName = "image-2.5-sunburst"
 
-		raw, err := adaptor.ConvertToOpenAIImageTask(task)
+		raw, err := adaptor.ConvertToOpenAIVideo(task)
 		require.NoError(t, err)
 
-		var got dto.OpenAIImageTask
+		var got dto.OpenAIVideo
 		require.NoError(t, common.Unmarshal(raw, &got))
 
 		assert.Equal(t, "task_public123", got.ID)
 		assert.NotContains(t, string(raw), "upstream_secret")
 		assert.Equal(t, "image-2.5-sunburst", got.Model)
-		assert.Equal(t, dto.ImageTaskStatusCompleted, got.Status)
+		assert.Equal(t, dto.VideoStatusCompleted, got.Status)
 		assert.Equal(t, "1024x1024", got.Size)
 		assert.Equal(t, int64(1200), got.CompletedAt)
 		assert.Equal(t, 100, got.Progress)
-		require.Len(t, got.Data, 2)
-		assert.Equal(t, "https://cdn.example.com/a.png", got.Data[0].URL)
-		assert.Equal(t, "a green cat", got.Data[0].RevisedPrompt)
-		assert.Equal(t, "aGk=", got.Data[1].B64JSON)
+		assert.Equal(t, "https://cdn.example.com/a.png", got.Metadata["url"])
+	})
+
+	t.Run("multiple images expose a urls list alongside url", func(t *testing.T) {
+		task := &model.Task{
+			TaskID: "task_multi",
+			Status: model.TaskStatusSuccess,
+			Data:   json.RawMessage(`{"data":[{"url":"https://cdn.example.com/a.png"},{"url":"https://cdn.example.com/b.png"}]}`),
+		}
+
+		raw, err := adaptor.ConvertToOpenAIVideo(task)
+		require.NoError(t, err)
+
+		var got dto.OpenAIVideo
+		require.NoError(t, common.Unmarshal(raw, &got))
+		assert.Equal(t, "https://cdn.example.com/a.png", got.Metadata["url"])
+		assert.Equal(t, []any{"https://cdn.example.com/a.png", "https://cdn.example.com/b.png"}, got.Metadata["urls"])
 	})
 
 	t.Run("success falls back to stored result url", func(t *testing.T) {
@@ -129,16 +143,15 @@ func TestConvertToOpenAIImageTask(t *testing.T) {
 		}
 		task.PrivateData.ResultURL = "https://cdn.example.com/fallback.png"
 
-		raw, err := adaptor.ConvertToOpenAIImageTask(task)
+		raw, err := adaptor.ConvertToOpenAIVideo(task)
 		require.NoError(t, err)
 
-		var got dto.OpenAIImageTask
+		var got dto.OpenAIVideo
 		require.NoError(t, common.Unmarshal(raw, &got))
-		require.Len(t, got.Data, 1)
-		assert.Equal(t, "https://cdn.example.com/fallback.png", got.Data[0].URL)
+		assert.Equal(t, "https://cdn.example.com/fallback.png", got.Metadata["url"])
 	})
 
-	t.Run("failure reports error and no data", func(t *testing.T) {
+	t.Run("failure reports error", func(t *testing.T) {
 		task := &model.Task{
 			TaskID:     "task_failed",
 			Status:     model.TaskStatusFailure,
@@ -146,32 +159,31 @@ func TestConvertToOpenAIImageTask(t *testing.T) {
 			FinishTime: 1300,
 		}
 
-		raw, err := adaptor.ConvertToOpenAIImageTask(task)
+		raw, err := adaptor.ConvertToOpenAIVideo(task)
 		require.NoError(t, err)
 
-		var got dto.OpenAIImageTask
+		var got dto.OpenAIVideo
 		require.NoError(t, common.Unmarshal(raw, &got))
-		assert.Equal(t, dto.ImageTaskStatusFailed, got.Status)
-		assert.Empty(t, got.Data)
+		assert.Equal(t, dto.VideoStatusFailed, got.Status)
 		require.NotNil(t, got.Error)
 		assert.Equal(t, "upstream rejected the prompt", got.Error.Message)
 	})
 
-	t.Run("in-flight task reports no data", func(t *testing.T) {
+	t.Run("in-flight task reports progress and no result", func(t *testing.T) {
 		task := &model.Task{
 			TaskID:   "task_running",
 			Status:   model.TaskStatusInProgress,
 			Progress: "30%",
 		}
 
-		raw, err := adaptor.ConvertToOpenAIImageTask(task)
+		raw, err := adaptor.ConvertToOpenAIVideo(task)
 		require.NoError(t, err)
 
-		var got dto.OpenAIImageTask
+		var got dto.OpenAIVideo
 		require.NoError(t, common.Unmarshal(raw, &got))
-		assert.Equal(t, dto.ImageTaskStatusInProgress, got.Status)
+		assert.Equal(t, dto.VideoStatusInProgress, got.Status)
 		assert.Equal(t, 30, got.Progress)
-		assert.Empty(t, got.Data)
+		assert.Empty(t, got.Metadata["url"])
 		assert.Nil(t, got.Error)
 	})
 }

@@ -97,6 +97,8 @@ export function TaskLogsFilterBar<TData>(props: TaskLogsFilterBarProps<TData>) {
         : {
             ...baseFilters,
             ...(searchParams.filter ? { taskId: searchParams.filter } : {}),
+            ...(searchParams.model ? { model: searchParams.model } : {}),
+            ...(searchParams.token ? { token: searchParams.token } : {}),
           }
 
     setFilters(next)
@@ -106,10 +108,16 @@ export function TaskLogsFilterBar<TData>(props: TaskLogsFilterBarProps<TData>) {
     searchParams.endTime,
     searchParams.channel,
     searchParams.filter,
+    searchParams.model,
+    searchParams.token,
   ])
 
+  // keyof 作用于联合类型只会得到共有字段，这里需要两种日志各自的字段
   const handleChange = useCallback(
-    (field: keyof TaskLogsFilters, value: Date | string | undefined) => {
+    (
+      field: keyof DrawingLogFilters | keyof TaskLogFilters,
+      value: Date | string | undefined
+    ) => {
       setFilters((prev) => ({ ...prev, [field]: value }))
     },
     []
@@ -164,7 +172,13 @@ export function TaskLogsFilterBar<TData>(props: TaskLogsFilterBarProps<TData>) {
     props.logCategory === 'drawing'
       ? t('Filter by MjProxy task ID')
       : t('Filter by task ID')
-  const hasAdditionalFilters = !!filterValue || !!filters.channel
+  // 模型名/令牌名只有任务日志有对应的可筛选列，绘图日志表里没有这两个字段
+  const isTask = props.logCategory === 'task'
+  const taskFilters = isTask ? (filters as TaskLogFilters) : undefined
+  const modelValue = taskFilters?.model || ''
+  const tokenValue = taskFilters?.token || ''
+  const hasAdditionalFilters =
+    !!filterValue || !!filters.channel || !!modelValue || !!tokenValue
   const dateRangeFilter = (
     <LogsFilterField wide>
       <CompactDateTimeRangePicker
@@ -188,6 +202,26 @@ export function TaskLogsFilterBar<TData>(props: TaskLogsFilterBarProps<TData>) {
       />
     </LogsFilterField>
   )
+  const modelFilter = isTask ? (
+    <LogsFilterField>
+      <LogsFilterInput
+        placeholder={t('Model Name')}
+        value={modelValue}
+        onChange={(e) => handleChange('model', e.target.value)}
+        onKeyDown={handleKeyDown}
+      />
+    </LogsFilterField>
+  ) : null
+  const tokenFilter = isTask ? (
+    <LogsFilterField>
+      <LogsFilterInput
+        placeholder={t('Token Name')}
+        value={tokenValue}
+        onChange={(e) => handleChange('token', e.target.value)}
+        onKeyDown={handleKeyDown}
+      />
+    </LogsFilterField>
+  ) : null
   const channelFilter = isAdmin ? (
     <LogsFilterField>
       <LogsFilterInput
@@ -206,6 +240,8 @@ export function TaskLogsFilterBar<TData>(props: TaskLogsFilterBarProps<TData>) {
         <>
           {dateRangeFilter}
           {taskIdFilter}
+          {modelFilter}
+          {tokenFilter}
           {channelFilter}
         </>
       }
@@ -213,10 +249,15 @@ export function TaskLogsFilterBar<TData>(props: TaskLogsFilterBarProps<TData>) {
       mobileFilters={
         <>
           {taskIdFilter}
+          {modelFilter}
+          {tokenFilter}
           {channelFilter}
         </>
       }
-      mobileFilterCount={[filterValue, filters.channel].filter(Boolean).length}
+      mobileFilterCount={
+        [filterValue, modelValue, tokenValue, filters.channel].filter(Boolean)
+          .length
+      }
       hasActiveFilters={hasAdditionalFilters}
       onSearch={handleApply}
       searchLoading={fetchingLogs > 0}

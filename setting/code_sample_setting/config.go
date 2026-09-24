@@ -2,6 +2,7 @@ package code_sample_setting
 
 import (
 	"strings"
+	"sync"
 
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/setting/config"
@@ -17,17 +18,32 @@ const MaxTemplateBytes = 8 * 1024
 // frontend tab set is derived from the same list, so both sides stay aligned.
 var SupportedLanguages = []string{"curl", "python", "typescript", "javascript"}
 
-// CodeSampleSetting holds the site-wide call-sample templates, keyed by
-// endpoint type and then by language. A model may override any entry through
-// its own models.code_samples column; anything left unset falls back to the
-// built-in samples compiled into the frontend.
+// CodeSampleSetting holds the call-sample overrides.
+//
+// Templates are site-wide, keyed by endpoint type and then by language.
+// Models holds per-model overrides, keyed by model name, then endpoint type,
+// then language. Per-model samples deliberately live here rather than on the
+// models table: a sample is presentation, not model metadata, so editing one
+// must never create or modify a 元信息 row. Anything left unset falls back to
+// the templates and then to the built-in samples compiled into the frontend.
 type CodeSampleSetting struct {
-	Templates map[string]map[string]string `json:"templates"`
+	Templates map[string]map[string]string            `json:"templates"`
+	Models    map[string]map[string]map[string]string `json:"models"`
 }
 
 var codeSampleSetting = CodeSampleSetting{
 	Templates: map[string]map[string]string{},
+	Models:    map[string]map[string]map[string]string{},
 }
+
+// settingLock guards codeSampleSetting for readers. The ConfigManager writes it
+// via reflection on option updates, so reads must not assume a stable map.
+var settingLock sync.RWMutex
+
+// MaxModelOverrides bounds how many models can carry their own samples. The
+// whole set is serialized into a single options row and returned on the public
+// pricing response, so it must not grow without limit.
+const MaxModelOverrides = 500
 
 func init() {
 	config.GlobalConfig.Register("code_sample_setting", &codeSampleSetting)
@@ -92,10 +108,9 @@ func Normalize(templates map[string]map[string]string) (map[string]map[string]st
 	return normalized, nil
 }
 
-// GetTemplates returns a deep copy so callers cannot mutate the live setting.
-func GetTemplates() map[string]map[string]string {
-	result := make(map[string]map[string]string, len(codeSampleSetting.Templates))
-	for endpointType, byLang := range codeSampleSetting.Templates {
+func cloneByEndpoint(src map[string]map[string]string) map[string]map[string]string {
+	result := make(map[string]map[string]string, len(src))
+	for endpointType, byLang := range src {
 		cloned := make(map[string]string, len(byLang))
 		for lang, code := range byLang {
 			cloned[lang] = code
@@ -105,8 +120,17 @@ func GetTemplates() map[string]map[string]string {
 	return result
 }
 
+// GetTemplates returns a deep copy so callers cannot mutate the live setting.
+func GetTemplates() map[string]map[string]string {
+	settingLock.RLock()
+	defer settingLock.RUnlock()
+	return cloneByEndpoint(codeSampleSetting.Templates)
+}
+
 // GetTemplate returns the configured sample for an endpoint type and language.
 func GetTemplate(endpointType, lang string) (string, bool) {
+	settingLock.RLock()
+	defer settingLock.RUnlock()
 	byLang, ok := codeSampleSetting.Templates[endpointType]
 	if !ok {
 		return "", false
@@ -116,4 +140,53 @@ func GetTemplate(endpointType, lang string) (string, bool) {
 		return "", false
 	}
 	return code, true
+}
+
+// GetModelSamples returns one model's overrides, or nil when it has none.
+func GetModelSamples(modelName string) map[string]map[string]string {
+	settingLock.RLock()
+	defer settingLock.RUnlock()
+	byEndpoint, ok := codeSampleSetting.Models[strings.TrimSpace(modelName)]
+	if !ok || len(byEndpoint) == 0 {
+		return nil
+	}
+	return cloneByEndpoint(byEndpoint)
+}
+
+// GetAllModelSamples returns a deep copy of every per-model override.
+func GetAllModelSamples() map[string]map[string]map[string]string {
+	settingLock.RLock()
+	defer settingLock.RUnlock()
+	result := make(map[string]map[string]map[string]string, len(codeSampleSetting.Models))
+	for modelName, byEndpoint := range codeSampleSetting.Models {
+		result[modelName] = cloneByEndpoint(byEndpoint)
+	}
+	return result
+}
+
+// BuildModelSamplesUpdate returns the full per-model override map with
+// modelName's entry replaced by samples, ready to be persisted as one options
+// row. Passing empty samples removes that model's entry entirely. The caller
+// persists the result; this function does not mutate the live setting.
+func BuildModelSamplesUpdate(modelName string, samples map[string]map[string]string) (map[string]map[string]map[string]string, error) {
+	modelName = strings.TrimSpace(modelName)
+	if modelName == "" {
+		return nil, &ValidationError{Reason: ReasonMissingModelName}
+	}
+
+	normalized, err := Normalize(samples)
+	if err != nil {
+		return nil, err
+	}
+
+	next := GetAllModelSamples()
+	if len(normalized) == 0 {
+		delete(next, modelName)
+		return next, nil
+	}
+	if _, exists := next[modelName]; !exists && len(next) >= MaxModelOverrides {
+		return nil, &ValidationError{Reason: ReasonTooManyModels}
+	}
+	next[modelName] = normalized
+	return next, nil
 }

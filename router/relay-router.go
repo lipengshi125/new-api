@@ -116,7 +116,8 @@ func SetRelayRouter(router *gin.Engine) {
 			controller.Relay(c, types.RelayFormatOpenAIImage)
 		})
 
-		// 异步图片任务：提交后轮询，形态与 /v1/videos 对齐。
+		// 异步图片任务：提交后轮询。GET /v1/images/{id} 与 GET /v1/videos/{id}
+		// 是同一查询端点的两个别名 —— 任一路径都能查任一任务，返回同一格式。
 		// 上述 /images/generations、/images/edits 为同步端点，不受影响。
 		httpRouter.POST("/images", controller.RelayTask)
 		httpRouter.GET("/images/:task_id", controller.RelayTaskFetch)

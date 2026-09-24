@@ -39,6 +39,7 @@ import {
   type AudioClip,
 } from '../dialogs/audio-preview-dialog'
 import { FailReasonDialog } from '../dialogs/fail-reason-dialog'
+import { ModelBadge } from '../model-badge'
 import { useUsageLogsContext } from '../usage-logs-provider'
 import {
   createDurationColumn,
@@ -290,6 +291,38 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
             size='sm'
             copyable={false}
             className='border-border/60 bg-muted/30 max-w-[120px] truncate rounded-md border px-1.5 py-0.5'
+          />
+        )
+      },
+    },
+    // 模型名称
+    {
+      id: 'model_name',
+      header: t('Model'),
+      // model_name 是可筛选的存储列；properties 是未回填的历史任务的兜底
+      accessorFn: (row) =>
+        row.model_name ||
+        row.properties?.origin_model_name ||
+        row.properties?.upstream_model_name ||
+        '',
+      cell: ({ row }) => {
+        const log = row.original
+        const properties = log.properties
+        const originModel =
+          log.model_name || properties?.origin_model_name || ''
+        const upstreamModel = properties?.upstream_model_name || ''
+        const modelName = originModel || upstreamModel
+        if (!modelName) {
+          return <span className='text-muted-foreground/60 text-xs'>-</span>
+        }
+        return (
+          <ModelBadge
+            modelName={modelName}
+            actualModel={
+              upstreamModel && upstreamModel !== modelName
+                ? upstreamModel
+                : undefined
+            }
           />
         )
       },

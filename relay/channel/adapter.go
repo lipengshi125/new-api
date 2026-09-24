@@ -81,9 +81,3 @@ type TaskAdaptor interface {
 type OpenAIVideoConverter interface {
 	ConvertToOpenAIVideo(originTask *model.Task) ([]byte, error)
 }
-
-// OpenAIImageTaskConverter is implemented by task adaptors that can render a
-// stored task as an async image response for GET /v1/images/{id}.
-type OpenAIImageTaskConverter interface {
-	ConvertToOpenAIImageTask(originTask *model.Task) ([]byte, error)
-}

@@ -49,6 +49,7 @@ type TaskDto struct {
 	Progress   string          `json:"progress"`
 	Properties any             `json:"properties"`
 	Username       string          `json:"username,omitempty"`
+	ModelName      string          `json:"model_name,omitempty"`
 	TokenName      string          `json:"token_name,omitempty"`
 	BillingSeconds float64         `json:"billing_seconds,omitempty"` // >0 表示按秒计费，值为秒数；0 表示按次计费
 	Data           json.RawMessage `json:"data"`

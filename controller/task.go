@@ -24,6 +24,8 @@ func GetAllTask(c *gin.Context) {
 		TaskID:         c.Query("task_id"),
 		Status:         c.Query("status"),
 		Action:         c.Query("action"),
+		ModelName:      c.Query("model_name"),
+		TokenName:      c.Query("token_name"),
 		StartTimestamp: startTimestamp,
 		EndTimestamp:   endTimestamp,
 		ChannelID:      c.Query("channel_id"),
@@ -49,6 +51,8 @@ func GetUserTask(c *gin.Context) {
 		TaskID:         c.Query("task_id"),
 		Status:         c.Query("status"),
 		Action:         c.Query("action"),
+		ModelName:      c.Query("model_name"),
+		TokenName:      c.Query("token_name"),
 		StartTimestamp: startTimestamp,
 		EndTimestamp:   endTimestamp,
 	}
@@ -76,11 +80,12 @@ func tasksToDto(tasks []*model.Task, fillUser bool) []*dto.TaskDto {
 		}
 	}
 
-	// Batch collect unique token IDs for name lookup
+	// 仅为没有 token_name 快照的历史任务回查令牌名，新任务直接用存储列，
+	// 这样展示值与可筛选列保持一致。
 	tokenNameMap := make(map[int]string)
 	tokenIdSet := types.NewSet[int]()
 	for _, task := range tasks {
-		if task.PrivateData.TokenId > 0 {
+		if task.TokenName == "" && task.PrivateData.TokenId > 0 {
 			tokenIdSet.Add(task.PrivateData.TokenId)
 		}
 	}
@@ -98,7 +103,7 @@ func tasksToDto(tasks []*model.Task, fillUser bool) []*dto.TaskDto {
 			}
 		}
 		d := relay.TaskModel2Dto(task)
-		if task.PrivateData.TokenId > 0 {
+		if d.TokenName == "" && task.PrivateData.TokenId > 0 {
 			d.TokenName = tokenNameMap[task.PrivateData.TokenId]
 		}
 		result[i] = d

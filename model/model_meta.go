@@ -1,7 +1,6 @@
 package model
 
 import (
-	"errors"
 	"strconv"
 	"strings"
 
@@ -23,17 +22,13 @@ type BoundChannel struct {
 }
 
 type Model struct {
-	Id          int    `json:"id"`
-	ModelName   string `json:"model_name" gorm:"size:128;not null;uniqueIndex:uk_model_name_delete_at,priority:1"`
-	Description string `json:"description,omitempty" gorm:"type:text"`
-	Icon        string `json:"icon,omitempty" gorm:"type:varchar(128)"`
-	Tags        string `json:"tags,omitempty" gorm:"type:varchar(255)"`
-	VendorID    int    `json:"vendor_id,omitempty" gorm:"index"`
-	Endpoints   string `json:"endpoints,omitempty" gorm:"type:text"`
-	// CodeSamples stores admin-authored call samples as JSON:
-	// {"<endpoint-type>": {"<lang>": "<code>"}}. Empty means fall back to the
-	// global templates and then to the frontend's built-in samples.
-	CodeSamples  string         `json:"code_samples,omitempty" gorm:"type:text"`
+	Id           int            `json:"id"`
+	ModelName    string         `json:"model_name" gorm:"size:128;not null;uniqueIndex:uk_model_name_delete_at,priority:1"`
+	Description  string         `json:"description,omitempty" gorm:"type:text"`
+	Icon         string         `json:"icon,omitempty" gorm:"type:varchar(128)"`
+	Tags         string         `json:"tags,omitempty" gorm:"type:varchar(255)"`
+	VendorID     int            `json:"vendor_id,omitempty" gorm:"index"`
+	Endpoints    string         `json:"endpoints,omitempty" gorm:"type:text"`
 	Status       int            `json:"status" gorm:"default:1"`
 	SyncOfficial int            `json:"sync_official" gorm:"default:1"`
 	CreatedTime  int64          `json:"created_time" gorm:"bigint"`
@@ -83,48 +78,12 @@ func (mi *Model) Update() error {
 	mi.UpdatedTime = common.GetTimestamp()
 	// 使用 Select 强制更新所有字段，包括零值
 	return DB.Model(&Model{}).Where("id = ?", mi.Id).
-		Select("model_name", "description", "icon", "tags", "vendor_id", "endpoints", "code_samples", "status", "sync_official", "name_rule", "updated_time").
+		Select("model_name", "description", "icon", "tags", "vendor_id", "endpoints", "status", "sync_official", "name_rule", "updated_time").
 		Updates(mi).Error
 }
 
 func (mi *Model) Delete() error {
 	return DB.Delete(mi).Error
-}
-
-// UpsertModelCodeSamples stores the per-model call-sample override for an exact
-// model name. The pricing page addresses models by name rather than by row id:
-// non-exact name rules (prefix/suffix/contains) let one row back many model
-// names, so writing by id could silently retarget a shared rule row. When no
-// exact-match row exists yet, one is created carrying just the samples.
-// An empty samples string clears the override.
-func UpsertModelCodeSamples(modelName string, samples string) error {
-	modelName = strings.TrimSpace(modelName)
-	if modelName == "" {
-		return errors.New("模型名称不能为空")
-	}
-
-	now := common.GetTimestamp()
-	var existing Model
-	err := DB.Where("model_name = ? AND name_rule = ?", modelName, NameRuleExact).First(&existing).Error
-	if err == nil {
-		return DB.Model(&Model{}).Where("id = ?", existing.Id).
-			Updates(map[string]interface{}{
-				"code_samples": samples,
-				"updated_time": now,
-			}).Error
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
-	}
-
-	created := Model{
-		ModelName:    modelName,
-		CodeSamples:  samples,
-		NameRule:     NameRuleExact,
-		Status:       1,
-		SyncOfficial: 1,
-	}
-	return created.Insert()
 }
 
 func GetVendorModelCounts() (map[int64]int64, error) {
