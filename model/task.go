@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"database/sql/driver"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	commonRelay "github.com/QuantumNous/new-api/relay/common"
+
+	"gorm.io/gorm"
 )
 
 type TaskStatus string
@@ -59,7 +62,13 @@ type Task struct {
 	FinishTime int64                 `json:"finish_time" gorm:"index"`
 	Progress   string                `json:"progress" gorm:"type:varchar(20);index"`
 	Properties Properties            `json:"properties" gorm:"type:json"`
-	Username   string                `json:"username,omitempty" gorm:"-"`
+	// ModelName/TokenName 是 Properties.OriginModelName 与提交时令牌名的可查询副本，
+	// 供任务日志按模型/令牌筛选使用。JSON 列无法跨 SQLite/MySQL/PostgreSQL 走索引，
+	// 因此这里冗余存储；与 logs 表的 model_name/token_name 一样是提交时快照，
+	// 令牌后续改名不会改写历史任务。
+	ModelName string `json:"model_name" gorm:"type:varchar(191);index;default:''"`
+	TokenName string `json:"token_name" gorm:"type:varchar(191);index;default:''"`
+	Username  string `json:"username,omitempty" gorm:"-"`
 	// 禁止返回给用户，内部可能包含key等隐私信息
 	PrivateData TaskPrivateData `json:"-" gorm:"column:private_data;type:json"`
 	Data        json.RawMessage `json:"data" gorm:"type:json"`
@@ -165,9 +174,59 @@ type SyncTaskQueryParams struct {
 	UserID         string
 	Action         string
 	Status         string
+	ModelName      string
+	TokenName      string
 	StartTimestamp int64
 	EndTimestamp   int64
 	UserIDs        []int
+}
+
+// applyTaskTextFilter 支持精确匹配，值中含 % 时按 LIKE 模糊匹配，
+// 与 applyExplicitLogTextFilter 在普通日志上的行为保持一致。
+func applyTaskTextFilter(query *gorm.DB, column string, value string) (*gorm.DB, error) {
+	if value == "" {
+		return query, nil
+	}
+	if strings.Contains(value, "%") {
+		pattern, err := sanitizeLikePattern(value)
+		if err != nil {
+			return nil, err
+		}
+		return query.Where(column+" LIKE ? ESCAPE '!'", pattern), nil
+	}
+	return query.Where(column+" = ?", value), nil
+}
+
+// applyTaskQueryFilters 施加任务列表与计数共用的筛选条件，
+// 使管理员/普通用户、列表/计数四条查询路径的筛选语义始终一致。
+func applyTaskQueryFilters(query *gorm.DB, queryParams SyncTaskQueryParams) (*gorm.DB, error) {
+	if queryParams.TaskID != "" {
+		query = query.Where("task_id = ?", queryParams.TaskID)
+	}
+	if queryParams.Action != "" {
+		query = query.Where("action = ?", queryParams.Action)
+	}
+	if queryParams.Status != "" {
+		query = query.Where("status = ?", queryParams.Status)
+	}
+	if queryParams.Platform != "" {
+		query = query.Where("platform = ?", queryParams.Platform)
+	}
+	query, err := applyTaskTextFilter(query, "model_name", queryParams.ModelName)
+	if err != nil {
+		return nil, err
+	}
+	query, err = applyTaskTextFilter(query, "token_name", queryParams.TokenName)
+	if err != nil {
+		return nil, err
+	}
+	if queryParams.StartTimestamp != 0 {
+		query = query.Where("submit_time >= ?", queryParams.StartTimestamp)
+	}
+	if queryParams.EndTimestamp != 0 {
+		query = query.Where("submit_time <= ?", queryParams.EndTimestamp)
+	}
+	return query, nil
 }
 
 func InitTask(platform constant.TaskPlatform, relayInfo *commonRelay.RelayInfo) *Task {
@@ -198,6 +257,7 @@ func InitTask(platform constant.TaskPlatform, relayInfo *commonRelay.RelayInfo) 
 		TaskID:      taskID,
 		UserId:      relayInfo.UserId,
 		Group:       relayInfo.UsingGroup,
+		ModelName:   properties.OriginModelName,
 		SubmitTime:  time.Now().Unix(),
 		Status:      TaskStatusNotStart,
 		Progress:    "0%",
@@ -211,29 +271,10 @@ func InitTask(platform constant.TaskPlatform, relayInfo *commonRelay.RelayInfo) 
 
 func TaskGetAllUserTask(userId int, startIdx int, num int, queryParams SyncTaskQueryParams) []*Task {
 	var tasks []*Task
-	var err error
 
-	// 初始化查询构建器
-	query := DB.Where("user_id = ?", userId)
-
-	if queryParams.TaskID != "" {
-		query = query.Where("task_id = ?", queryParams.TaskID)
-	}
-	if queryParams.Action != "" {
-		query = query.Where("action = ?", queryParams.Action)
-	}
-	if queryParams.Status != "" {
-		query = query.Where("status = ?", queryParams.Status)
-	}
-	if queryParams.Platform != "" {
-		query = query.Where("platform = ?", queryParams.Platform)
-	}
-	if queryParams.StartTimestamp != 0 {
-		// 假设您已将前端传来的时间戳转换为数据库所需的时间格式，并处理了时间戳的验证和解析
-		query = query.Where("submit_time >= ?", queryParams.StartTimestamp)
-	}
-	if queryParams.EndTimestamp != 0 {
-		query = query.Where("submit_time <= ?", queryParams.EndTimestamp)
+	query, err := applyTaskQueryFilters(DB.Where("user_id = ?", userId), queryParams)
+	if err != nil {
+		return nil
 	}
 
 	// 获取数据
@@ -247,7 +288,6 @@ func TaskGetAllUserTask(userId int, startIdx int, num int, queryParams SyncTaskQ
 
 func TaskGetAllTasks(startIdx int, num int, queryParams SyncTaskQueryParams) []*Task {
 	var tasks []*Task
-	var err error
 
 	// 初始化查询构建器
 	query := DB
@@ -256,29 +296,15 @@ func TaskGetAllTasks(startIdx int, num int, queryParams SyncTaskQueryParams) []*
 	if queryParams.ChannelID != "" {
 		query = query.Where("channel_id = ?", queryParams.ChannelID)
 	}
-	if queryParams.Platform != "" {
-		query = query.Where("platform = ?", queryParams.Platform)
-	}
 	if queryParams.UserID != "" {
 		query = query.Where("user_id = ?", queryParams.UserID)
 	}
 	if len(queryParams.UserIDs) != 0 {
 		query = query.Where("user_id in (?)", queryParams.UserIDs)
 	}
-	if queryParams.TaskID != "" {
-		query = query.Where("task_id = ?", queryParams.TaskID)
-	}
-	if queryParams.Action != "" {
-		query = query.Where("action = ?", queryParams.Action)
-	}
-	if queryParams.Status != "" {
-		query = query.Where("status = ?", queryParams.Status)
-	}
-	if queryParams.StartTimestamp != 0 {
-		query = query.Where("submit_time >= ?", queryParams.StartTimestamp)
-	}
-	if queryParams.EndTimestamp != 0 {
-		query = query.Where("submit_time <= ?", queryParams.EndTimestamp)
+	query, err := applyTaskQueryFilters(query, queryParams)
+	if err != nil {
+		return nil
 	}
 
 	// 获取数据
@@ -473,29 +499,15 @@ func TaskCountAllTasks(queryParams SyncTaskQueryParams) int64 {
 	if queryParams.ChannelID != "" {
 		query = query.Where("channel_id = ?", queryParams.ChannelID)
 	}
-	if queryParams.Platform != "" {
-		query = query.Where("platform = ?", queryParams.Platform)
-	}
 	if queryParams.UserID != "" {
 		query = query.Where("user_id = ?", queryParams.UserID)
 	}
 	if len(queryParams.UserIDs) != 0 {
 		query = query.Where("user_id in (?)", queryParams.UserIDs)
 	}
-	if queryParams.TaskID != "" {
-		query = query.Where("task_id = ?", queryParams.TaskID)
-	}
-	if queryParams.Action != "" {
-		query = query.Where("action = ?", queryParams.Action)
-	}
-	if queryParams.Status != "" {
-		query = query.Where("status = ?", queryParams.Status)
-	}
-	if queryParams.StartTimestamp != 0 {
-		query = query.Where("submit_time >= ?", queryParams.StartTimestamp)
-	}
-	if queryParams.EndTimestamp != 0 {
-		query = query.Where("submit_time <= ?", queryParams.EndTimestamp)
+	query, err := applyTaskQueryFilters(query, queryParams)
+	if err != nil {
+		return 0
 	}
 	_ = query.Count(&total).Error
 	return total
@@ -504,24 +516,9 @@ func TaskCountAllTasks(queryParams SyncTaskQueryParams) int64 {
 // TaskCountAllUserTask returns total tasks for given user
 func TaskCountAllUserTask(userId int, queryParams SyncTaskQueryParams) int64 {
 	var total int64
-	query := DB.Model(&Task{}).Where("user_id = ?", userId)
-	if queryParams.TaskID != "" {
-		query = query.Where("task_id = ?", queryParams.TaskID)
-	}
-	if queryParams.Action != "" {
-		query = query.Where("action = ?", queryParams.Action)
-	}
-	if queryParams.Status != "" {
-		query = query.Where("status = ?", queryParams.Status)
-	}
-	if queryParams.Platform != "" {
-		query = query.Where("platform = ?", queryParams.Platform)
-	}
-	if queryParams.StartTimestamp != 0 {
-		query = query.Where("submit_time >= ?", queryParams.StartTimestamp)
-	}
-	if queryParams.EndTimestamp != 0 {
-		query = query.Where("submit_time <= ?", queryParams.EndTimestamp)
+	query, err := applyTaskQueryFilters(DB.Model(&Task{}).Where("user_id = ?", userId), queryParams)
+	if err != nil {
+		return 0
 	}
 	_ = query.Count(&total).Error
 	return total
