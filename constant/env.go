@@ -19,6 +19,14 @@ var ErrorLogEnabled bool
 var TaskQueryLimit int
 var TaskTimeoutMinutes int
 
+// TaskPollingIntervalSeconds is how often one async-task polling round starts.
+// A round fetches every unfinished task one-by-one from upstream, so this is the
+// upstream request rate divided by the concurrent task count. Lowering it cuts
+// the result latency clients see but multiplies upstream load and the risk of
+// being rate limited; the scheduler never overlaps rounds, so the effective
+// interval is max(this, one round's duration).
+var TaskPollingIntervalSeconds int
+
 // temporary variable for sora patch, will be removed in future
 var TaskPricePatches []string
 

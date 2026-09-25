@@ -143,7 +143,11 @@ func (asyncTaskPollHandler) Enabled() bool {
 	return constant.UpdateTask && model.HasUnfinishedSyncTasks()
 }
 
-func (asyncTaskPollHandler) Interval() time.Duration { return 15 * time.Second }
+// Interval is configurable via TASK_POLLING_INTERVAL because the right cadence
+// depends on how aggressively the upstream providers rate limit this path.
+func (asyncTaskPollHandler) Interval() time.Duration {
+	return time.Duration(constant.TaskPollingIntervalSeconds) * time.Second
+}
 
 func (asyncTaskPollHandler) NewPayload() any { return nil }
 

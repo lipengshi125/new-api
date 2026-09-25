@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -231,4 +232,73 @@ func TestEnqueueSystemTaskReportsCreatedAndExistingActive(t *testing.T) {
 	require.True(t, created)
 	require.NotNil(t, second)
 	assert.NotEqual(t, first.TaskID, second.TaskID)
+}
+
+// A scheduled job cannot run more often than the runner wakes, so a handler
+// configured below the base intervals (TASK_POLLING_INTERVAL=3, say) must pull
+// the wake-up down with it instead of being silently rounded up.
+func TestSystemTaskWakeIntervalTracksShortestHandlerInterval(t *testing.T) {
+	cases := []struct {
+		name      string
+		intervals []time.Duration
+		expected  time.Duration
+	}{
+		{
+			name:      "no handlers falls back to the scheduler interval",
+			intervals: nil,
+			expected:  systemTaskSchedulerInterval,
+		},
+		{
+			name:      "intervals above the base are not followed upward",
+			intervals: []time.Duration{time.Minute, 30 * time.Minute},
+			expected:  systemTaskSchedulerInterval,
+		},
+		{
+			name:      "a sub-base interval pulls the wake-up down",
+			intervals: []time.Duration{3 * time.Second, 30 * time.Minute},
+			expected:  3 * time.Second,
+		},
+		{
+			name:      "the shortest handler wins regardless of order",
+			intervals: []time.Duration{30 * time.Minute, 2 * time.Second, time.Minute},
+			expected:  2 * time.Second,
+		},
+		{
+			name:      "a non-positive interval is ignored rather than stalling the runner",
+			intervals: []time.Duration{0, -time.Second, time.Minute},
+			expected:  systemTaskSchedulerInterval,
+		},
+		{
+			name:      "sub-second config is clamped to one second",
+			intervals: []time.Duration{time.Millisecond},
+			expected:  time.Second,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			handlers := make([]SystemTaskHandler, 0, len(tc.intervals))
+			for i, interval := range tc.intervals {
+				handlers = append(handlers, &stubScheduledHandler{
+					taskType: fmt.Sprintf("test_wake_%d", i),
+					enabled:  true,
+					interval: interval,
+				})
+			}
+			withSystemTaskRegistry(t, handlers...)
+
+			assert.Equal(t, tc.expected, systemTaskWakeInterval())
+		})
+	}
+}
+
+// Enabled() can hit the database, so the wake-up computation must not consult it.
+func TestSystemTaskWakeIntervalIgnoresEnabled(t *testing.T) {
+	withSystemTaskRegistry(t, &stubScheduledHandler{
+		taskType: "test_wake_disabled",
+		enabled:  false,
+		interval: 3 * time.Second,
+	})
+
+	assert.Equal(t, 3*time.Second, systemTaskWakeInterval())
 }

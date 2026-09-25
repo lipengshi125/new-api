@@ -23,9 +23,37 @@ const (
 
 	// systemTaskSchedulerInterval throttles how often the scheduler/stale-lock
 	// pass runs, independent of how often the runner wakes to claim tasks.
-	systemTaskSchedulerInterval = 15 * time.Second
+	systemTaskSchedulerInterval = 5 * time.Second
 	systemTaskStaleLockInterval = 30 * time.Second
 )
+
+// systemTaskWakeInterval is how long the runner sleeps between passes. A
+// scheduled job can never run more often than the runner wakes and than the
+// scheduler pass creates rows, so a handler configured below those base
+// intervals (for example TASK_POLLING_INTERVAL=3) pulls the wake-up down with
+// it. Nothing here lengthens another job's cadence: each one still runs on its
+// own Interval(), waking more often only makes the scheduler notice sooner that
+// a job is due. Enabled() is deliberately not consulted, since it can hit the
+// database and this runs on every pass.
+func systemTaskWakeInterval() time.Duration {
+	wake := systemTaskRunnerIdleInterval
+	if systemTaskSchedulerInterval < wake {
+		wake = systemTaskSchedulerInterval
+	}
+	for _, handler := range registeredSystemTaskHandlers() {
+		scheduled, ok := handler.(ScheduledSystemTaskHandler)
+		if !ok {
+			continue
+		}
+		if interval := scheduled.Interval(); interval > 0 && interval < wake {
+			wake = interval
+		}
+	}
+	if wake < time.Second {
+		wake = time.Second
+	}
+	return wake
+}
 
 // SystemTaskHandler executes a claimed task of a specific type. Run owns the
 // task lifecycle from claim to terminal state: it MUST call
@@ -128,9 +156,10 @@ func StartSystemTaskRunner() {
 
 		runnerID := fmt.Sprintf("%s-%s", common.NodeName, common.GetRandomString(8))
 		gopool.Go(func() {
-			logger.LogInfo(context.Background(), fmt.Sprintf("system task runner started: runner=%s idle_interval=%s", runnerID, systemTaskRunnerIdleInterval))
+			wakeInterval := systemTaskWakeInterval()
+			logger.LogInfo(context.Background(), fmt.Sprintf("system task runner started: runner=%s idle_interval=%s", runnerID, wakeInterval))
 
-			ticker := time.NewTicker(systemTaskRunnerIdleInterval)
+			ticker := time.NewTicker(wakeInterval)
 			defer ticker.Stop()
 
 			var lastScheduler time.Time
@@ -146,7 +175,10 @@ func StartSystemTaskRunner() {
 						logger.LogWarn(context.Background(), fmt.Sprintf("system task stale lock cleanup failed: %v", err))
 					}
 				}
-				if now.Sub(lastScheduler) >= systemTaskSchedulerInterval {
+				// The scheduler creates the rows a due job runs from, so it has to
+				// run at least as often as the shortest configured interval or that
+				// job's cadence would be rounded up to this throttle.
+				if now.Sub(lastScheduler) >= wakeInterval {
 					lastScheduler = now
 					runSystemTaskScheduler()
 				}

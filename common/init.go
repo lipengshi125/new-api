@@ -21,6 +21,13 @@ var (
 	LogDir       = flag.String("log-dir", "./logs", "specify the log directory")
 )
 
+// defaultTaskPollingIntervalSeconds is the async-task polling cadence. It is
+// close to how long one round already takes with a handful of in-flight tasks,
+// so it mostly removes idle waiting rather than adding upstream load. Raise it
+// via TASK_POLLING_INTERVAL if an upstream starts returning 429 on the fetch
+// path.
+const defaultTaskPollingIntervalSeconds = 5
+
 func printHelp() {
 	fmt.Println("NewAPI(Based OneAPI) " + Version + " - The next-generation LLM gateway and AI asset management system supports multiple languages.")
 	fmt.Println("Original Project: OneAPI by JustSong - https://github.com/songquanpeng/one-api")
@@ -159,6 +166,13 @@ func initConstantEnv() {
 	constant.TaskQueryLimit = GetEnvOrDefault("TASK_QUERY_LIMIT", 1000)
 	// 异步任务超时时间（分钟），超过此时间未完成的任务将被标记为失败并退款。0 表示禁用。
 	constant.TaskTimeoutMinutes = GetEnvOrDefault("TASK_TIMEOUT_MINUTES", 1440)
+	// 异步任务轮询间隔（秒）。每轮会逐个向上游查询所有未完成任务，调小可降低
+	// 下游拿到结果的延迟，但会成比例放大上游请求量与被限流的概率。
+	constant.TaskPollingIntervalSeconds = GetEnvOrDefault("TASK_POLLING_INTERVAL", defaultTaskPollingIntervalSeconds)
+	if constant.TaskPollingIntervalSeconds < 1 {
+		SysError(fmt.Sprintf("TASK_POLLING_INTERVAL must be at least 1 second, got %d, using default value: %d", constant.TaskPollingIntervalSeconds, defaultTaskPollingIntervalSeconds))
+		constant.TaskPollingIntervalSeconds = defaultTaskPollingIntervalSeconds
+	}
 
 	soraPatchStr := GetEnvOrDefaultString("TASK_PRICE_PATCH", "")
 	if soraPatchStr != "" {
