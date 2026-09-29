@@ -254,12 +254,16 @@ func InitTask(platform constant.TaskPlatform, relayInfo *commonRelay.RelayInfo) 
 	}
 
 	t := &Task{
-		TaskID:      taskID,
-		UserId:      relayInfo.UserId,
-		Group:       relayInfo.UsingGroup,
-		ModelName:   properties.OriginModelName,
-		SubmitTime:  time.Now().Unix(),
-		Status:      TaskStatusNotStart,
+		TaskID:     taskID,
+		UserId:     relayInfo.UserId,
+		Group:      relayInfo.UsingGroup,
+		ModelName:  properties.OriginModelName,
+		SubmitTime: time.Now().Unix(),
+		// A task row is only created after the upstream accepted the submission,
+		// so SUBMITTED is the truthful starting state. NOT_START used to persist
+		// until the first polling round wrote a status back, which made freshly
+		// accepted tasks read as "not started" for a whole interval.
+		Status:      TaskStatusSubmitted,
 		Progress:    "0%",
 		ChannelId:   relayInfo.ChannelId,
 		Platform:    platform,
