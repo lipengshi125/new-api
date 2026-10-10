@@ -602,6 +602,14 @@ func RelayTask(c *gin.Context) {
 	}
 
 	if taskErr != nil {
+		// Upstream rejected the submission, so no task row exists for the
+		// poller to record later. Local errors (bad request, no channel) say
+		// nothing about the model's reliability and are not counted.
+		if !taskErr.LocalError {
+			gopool.Go(func() {
+				perfmetrics.RecordRelaySample(relayInfo, false, 0)
+			})
+		}
 		respondTaskError(c, taskErr)
 	}
 }

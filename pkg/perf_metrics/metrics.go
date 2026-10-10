@@ -54,6 +54,32 @@ func RecordRelaySample(info *relaycommon.RelayInfo, success bool, outputTokens i
 	})
 }
 
+// RecordTaskSample records one async task (video/image/...) at its terminal
+// state. Async tasks never pass through the synchronous quota paths that call
+// RecordRelaySample, so without this the marketplace shows no data for them.
+// Latency is submit-to-finish, the wait a client actually experiences. Callers
+// must invoke it once per task, on the transition that wins the status CAS.
+func RecordTaskSample(task *model.Task, success bool) {
+	if task == nil {
+		return
+	}
+	modelName := task.Properties.OriginModelName
+	if modelName == "" {
+		modelName = task.ModelName
+	}
+	latencyMs := int64(0)
+	if task.SubmitTime > 0 && task.FinishTime >= task.SubmitTime {
+		latencyMs = (task.FinishTime - task.SubmitTime) * 1000
+	}
+	Record(Sample{
+		Model:        modelName,
+		Group:        task.Group,
+		LatencyMs:    latencyMs,
+		Success:      success,
+		GenerationMs: latencyMs,
+	})
+}
+
 func Record(sample Sample) {
 	setting := perf_metrics_setting.GetSetting()
 	if !setting.Enabled || sample.Model == "" {
