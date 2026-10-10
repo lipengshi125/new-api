@@ -35,6 +35,32 @@ export async function getPricing(): Promise<PricingData> {
  * because non-exact name rules let one metadata row back many model names.
  * An empty map clears the override.
  */
+export type ModelApiDoc = {
+  model_name: string
+  content: string
+  updated_time?: number
+}
+
+/** Fetch a model's Markdown API document; content is empty when none is set. */
+export async function getModelApiDoc(modelName: string): Promise<ModelApiDoc> {
+  const res = await api.get('/api/pricing/api_doc', {
+    params: { model_name: modelName },
+  })
+  return res.data.data
+}
+
+/** Save a model's Markdown API document. Empty content restores the default. */
+export async function updateModelApiDoc(params: {
+  modelName: string
+  content: string
+}): Promise<{ success: boolean; message?: string }> {
+  const res = await api.put('/api/models/api_doc', {
+    model_name: params.modelName,
+    content: params.content,
+  })
+  return res.data
+}
+
 export async function updateModelCodeSamples(params: {
   modelName: string
   codeSamples: CodeSampleMap

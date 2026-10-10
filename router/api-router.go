@@ -32,6 +32,8 @@ func SetApiRouter(router *gin.Engine) {
 		//apiRouter.GET("/midjourney", controller.GetMidjourney)
 		apiRouter.GET("/home_page_content", controller.GetHomePageContent)
 		apiRouter.GET("/pricing", middleware.HeaderNavModuleAuth("pricing"), controller.GetPricing)
+		// 模型 API 文档与定价页同一访问控制：能看模型广场就能看文档。
+		apiRouter.GET("/pricing/api_doc", middleware.HeaderNavModuleAuth("pricing"), controller.GetModelAPIDoc)
 		perfMetricsRoute := apiRouter.Group("/perf-metrics")
 		perfMetricsRoute.Use(middleware.HeaderNavModulePublicOrUserAuth("pricing"))
 		{
@@ -351,6 +353,7 @@ func SetApiRouter(router *gin.Engine) {
 			modelsRoute.POST("/", controller.CreateModelMeta)
 			modelsRoute.PUT("/", controller.UpdateModelMeta)
 			modelsRoute.PUT("/code_samples", controller.UpdateModelCodeSamples)
+			modelsRoute.PUT("/api_doc", controller.UpdateModelAPIDoc)
 			modelsRoute.DELETE("/:id", controller.DeleteModelMeta)
 		}
 

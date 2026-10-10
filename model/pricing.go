@@ -43,6 +43,10 @@ type Pricing struct {
 	// type then language. Absent entries fall back to the global templates
 	// returned alongside the pricing payload, then to the built-in samples.
 	CodeSamples map[string]map[string]string `json:"code_samples,omitempty"`
+	// HasAPIDoc reports that an admin-authored Markdown document replaces the
+	// auto-generated API panel. The document itself is fetched on demand so the
+	// public pricing response stays small.
+	HasAPIDoc bool `json:"has_api_doc,omitempty"`
 }
 
 type PricingVendor struct {
@@ -194,6 +198,12 @@ func updatePricing() {
 	// 预加载模型元数据与供应商一次，避免循环查询
 	var allMeta []Model
 	_ = DB.Find(&allMeta).Error
+	apiDocNames, err := GetModelAPIDocNameSet()
+	if err != nil {
+		// A missing flag only hides the custom doc; the panel falls back to the
+		// auto-generated sections, so pricing must still be built.
+		common.SysLog(fmt.Sprintf("GetModelAPIDocNameSet error: %v", err))
+	}
 	metaMap := make(map[string]*Model)
 	prefixList := make([]*Model, 0)
 	suffixList := make([]*Model, 0)
@@ -383,6 +393,7 @@ func updatePricing() {
 		// Call samples live in options, not in the model metadata row, so a
 		// model with no 元信息 entry can still carry them.
 		pricing.CodeSamples = code_sample_setting.GetModelSamples(model)
+		_, pricing.HasAPIDoc = apiDocNames[model]
 		modelPrice, findPrice := ratio_setting.GetModelPrice(model, false)
 		if findPrice {
 			pricing.ModelPrice = modelPrice

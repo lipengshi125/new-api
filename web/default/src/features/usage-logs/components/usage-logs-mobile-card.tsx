@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { flexRender, type Cell, type Table } from '@tanstack/react-table'
 import { Database } from 'lucide-react'
+import type { MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -63,6 +64,7 @@ interface UsageLogsMobileListProps<TData> {
   emptyTitle?: string
   emptyDescription?: string
   logCategory: LogCategory
+  onRowClick?: (e: MouseEvent<HTMLElement>, original: TData) => void
 }
 
 function UsageLogsMobileSkeleton() {
@@ -454,6 +456,7 @@ export function UsageLogsMobileList<TData>({
   emptyTitle,
   emptyDescription,
   logCategory,
+  onRowClick,
 }: UsageLogsMobileListProps<TData>) {
   const { t } = useTranslation()
 
@@ -501,8 +504,12 @@ export function UsageLogsMobileList<TData>({
             key={row.id}
             className={cn(
               'border-border/40 border-b border-l-2 border-l-transparent p-3 transition-colors last:border-b-0',
-              tintClass
+              tintClass,
+              onRowClick && 'cursor-pointer'
             )}
+            onClick={
+              onRowClick ? (e) => onRowClick(e, row.original) : undefined
+            }
           >
             {logCategory === 'common' && <CommonLogsCard cells={cells} />}
             {logCategory === 'task' && <TaskLogsCard cells={cells} />}

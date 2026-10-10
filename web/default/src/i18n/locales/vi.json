@@ -1076,6 +1076,7 @@
     "Copied: {{model}}": "Đã sao chép: {{model}}",
     "Copied!": "Đã sao chép!",
     "Copy": "Sao chép",
+    "Copy Markdown": "Sao chép Markdown",
     "Copy {{name}} pricing": "Sao chép giá của {{name}}",
     "Copy a request header": "Sao chép header yêu cầu",
     "Copy All": "Sao chép tất cả",
@@ -5236,6 +5237,12 @@
     "Zero retention": "Không lưu dữ liệu",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Task Details": "Chi tiết tác vụ",
+    "View the complete details for this task": "Xem toàn bộ chi tiết của tác vụ này",
+    "Edit API document": "Chỉnh sửa tài liệu API",
+    "Failed to save API documentation": "Không thể lưu tài liệu API",
+    "API documentation saved": "Đã lưu tài liệu API",
+    "Edit API documentation": "Chỉnh sửa tài liệu API"
   }
 }

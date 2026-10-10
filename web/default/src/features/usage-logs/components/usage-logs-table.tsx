@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQuery } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
 import { type ColumnDef } from '@tanstack/react-table'
+import { useState, type MouseEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -39,8 +40,9 @@ import {
 import { useColumnsByCategory } from '../lib/columns'
 import { parseLogOther } from '../lib/format'
 import { fetchLogsByCategory } from '../lib/utils'
-import type { LogCategory } from '../types'
+import type { LogCategory, TaskLog } from '../types'
 import { CommonLogsFilterBar } from './common-logs-filter-bar'
+import { TaskDetailsDialog } from './dialogs/task-details-dialog'
 import { TaskLogsFilterBar } from './task-logs-filter-bar'
 import { UsageLogsMobileList } from './usage-logs-mobile-card'
 import { useLogsViewScope } from './usage-logs-provider'
@@ -55,6 +57,11 @@ const logTypeRowTint: Record<number, string> = {
 // Warning tint for logs where a quota conversion saturated (admin-only marker).
 // Takes precedence over the per-type tint since it flags a billing anomaly.
 const quotaSaturationRowTint = 'bg-amber-50/60 dark:bg-amber-950/25'
+
+// Clicks on these elements keep their own behavior (copy, preview, user info)
+// instead of opening the task details dialog.
+const TASK_ROW_INTERACTIVE_SELECTOR =
+  'button, a, input, video, audio, [data-slot=status-badge]'
 
 function getColumnVisibilityStorageKey(
   logCategory: LogCategory,
@@ -152,6 +159,8 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
     },
   })
 
+  const [selectedTaskLog, setSelectedTaskLog] = useState<TaskLog | null>(null)
+
   const logs = data?.items || []
   const columns = useColumnsByCategory(logCategory, isAdmin)
   const isLoadingData = isLoading || (isFetching && !data)
@@ -175,60 +184,98 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
   })
 
   const isCommon = logCategory === 'common'
+  const isTask = logCategory === 'task'
+
+  // 任务日志：点击行的空白处查看完整 JSON；单元格内的按钮/链接/徽章保持各自行为。
+  // 弹窗通过 portal 渲染，React 事件仍会冒泡到行，需用 DOM contains 排除。
+  const handleTaskRowClick = (e: MouseEvent<HTMLElement>, log: TaskLog) => {
+    const target = e.target as HTMLElement
+    if (!e.currentTarget.contains(target)) return
+    if (target.closest(TASK_ROW_INTERACTIVE_SELECTOR)) return
+    if (window.getSelection()?.toString()) return
+    setSelectedTaskLog(log)
+  }
 
   return (
-    <DataTablePage
-      table={table}
-      columns={columns as ColumnDef<Record<string, unknown>>[]}
-      isLoading={isLoadingData}
-      isFetching={isFetching}
-      emptyTitle={t('No Logs Found')}
-      emptyDescription={t(
-        'No usage logs available. Logs will appear here once API calls are made.'
-      )}
-      skeletonKeyPrefix='usage-log-skeleton'
-      applyHeaderSize
-      tableClassName={cn(
-        '[&_[data-slot=table]]:text-[13px] [&_[data-slot=table]_td]:text-[13px] [&_[data-slot=table]_td_*]:text-[13px] [&_[data-slot=table]_th]:text-[13px] [&_[data-slot=table]_th_*]:text-[13px]'
-      )}
-      mobile={
-        <UsageLogsMobileList
-          table={table}
-          isLoading={isLoadingData}
-          logCategory={logCategory}
-        />
-      }
-      toolbar={
-        isCommon ? (
-          <CommonLogsFilterBar table={table} />
-        ) : (
-          <TaskLogsFilterBar table={table} logCategory={logCategory} />
-        )
-      }
-      renderRow={(row) => {
-        const logType = (row.original as Record<string, unknown>).type as
-          | number
-          | undefined
-        let tintClass =
-          isCommon && logType != null ? (logTypeRowTint[logType] ?? '') : ''
-        if (isCommon && isAdmin) {
-          const other = parseLogOther(
-            ((row.original as Record<string, unknown>).other as string) ?? ''
-          )
-          if (other?.admin_info?.quota_saturation) {
-            tintClass = quotaSaturationRowTint
-          }
-        }
-
-        return (
-          <DataTableRow
-            key={row.id}
-            row={row}
-            className={cn('transition-colors', tintClass)}
-            getColumnClassName={() => (isCommon ? 'py-2' : 'py-3.5')}
+    <>
+      <DataTablePage
+        table={table}
+        columns={columns as ColumnDef<Record<string, unknown>>[]}
+        isLoading={isLoadingData}
+        isFetching={isFetching}
+        emptyTitle={t('No Logs Found')}
+        emptyDescription={t(
+          'No usage logs available. Logs will appear here once API calls are made.'
+        )}
+        skeletonKeyPrefix='usage-log-skeleton'
+        applyHeaderSize
+        tableClassName={cn(
+          '[&_[data-slot=table]]:text-[13px] [&_[data-slot=table]_td]:text-[13px] [&_[data-slot=table]_td_*]:text-[13px] [&_[data-slot=table]_th]:text-[13px] [&_[data-slot=table]_th_*]:text-[13px]'
+        )}
+        mobile={
+          <UsageLogsMobileList
+            table={table}
+            isLoading={isLoadingData}
+            logCategory={logCategory}
+            onRowClick={
+              isTask
+                ? (e, original) =>
+                    handleTaskRowClick(e, original as unknown as TaskLog)
+                : undefined
+            }
           />
-        )
-      }}
-    />
+        }
+        toolbar={
+          isCommon ? (
+            <CommonLogsFilterBar table={table} />
+          ) : (
+            <TaskLogsFilterBar table={table} logCategory={logCategory} />
+          )
+        }
+        renderRow={(row) => {
+          const logType = (row.original as Record<string, unknown>).type as
+            | number
+            | undefined
+          let tintClass =
+            isCommon && logType != null ? (logTypeRowTint[logType] ?? '') : ''
+          if (isCommon && isAdmin) {
+            const other = parseLogOther(
+              ((row.original as Record<string, unknown>).other as string) ?? ''
+            )
+            if (other?.admin_info?.quota_saturation) {
+              tintClass = quotaSaturationRowTint
+            }
+          }
+
+          return (
+            <DataTableRow
+              key={row.id}
+              row={row}
+              className={cn(
+                'transition-colors',
+                tintClass,
+                isTask && 'cursor-pointer'
+              )}
+              getColumnClassName={() => (isCommon ? 'py-2' : 'py-3.5')}
+              onClick={
+                isTask
+                  ? (e) =>
+                      handleTaskRowClick(e, row.original as unknown as TaskLog)
+                  : undefined
+              }
+            />
+          )
+        }}
+      />
+      {isTask && (
+        <TaskDetailsDialog
+          log={selectedTaskLog}
+          open={selectedTaskLog != null}
+          onOpenChange={(open) => {
+            if (!open) setSelectedTaskLog(null)
+          }}
+        />
+      )}
+    </>
   )
 }

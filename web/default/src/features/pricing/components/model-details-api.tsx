@@ -16,8 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useQuery } from '@tanstack/react-query'
 import {
   ChevronRight,
+  FileText,
   Gauge,
   KeyRound,
   Pencil,
@@ -39,10 +41,12 @@ import {
 } from '@/components/data-table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useIsAdmin } from '@/hooks/use-admin'
 import { useStatus } from '@/hooks/use-status'
 
+import { getModelApiDoc } from '../api'
 import { resolveCodeSample } from '../lib/code-samples'
 import {
   buildRateLimits,
@@ -52,6 +56,8 @@ import {
 } from '../lib/mock-stats'
 import { replaceModelInPath } from '../lib/model-helpers'
 import type { CodeSampleMap, PricingModel } from '../types'
+import { ModelApiDoc } from './model-api-doc'
+import { ModelApiDocEditor } from './model-api-doc-editor'
 import {
   CodeSampleEditor,
   CodeSampleSourceBadge,
@@ -823,8 +829,59 @@ export function ModelDetailsApi(props: {
   endpointMap: Record<string, { path?: string; method?: string }>
   codeSampleTemplates?: CodeSampleMap
 }) {
+  const { t } = useTranslation()
+  const isAdmin = useIsAdmin()
+  const [isEditingDoc, setIsEditingDoc] = useState(false)
+  const modelName = props.model.model_name || ''
+  const hasDoc = Boolean(props.model.has_api_doc)
+
+  // Only models flagged with a document trigger the extra request.
+  const docQuery = useQuery({
+    queryKey: ['model-api-doc', modelName],
+    queryFn: () => getModelApiDoc(modelName),
+    enabled: hasDoc,
+  })
+  const docContent = docQuery.data?.content ?? ''
+
+  if (hasDoc && docQuery.isPending) {
+    return <Skeleton className='h-64 w-full' />
+  }
+
+  if (isEditingDoc) {
+    return (
+      <ModelApiDocEditor
+        modelName={modelName}
+        initialContent={docContent}
+        hasDoc={hasDoc}
+        onClose={() => setIsEditingDoc(false)}
+      />
+    )
+  }
+
+  const editButton = isAdmin && (
+    <Button
+      size='sm'
+      variant='ghost'
+      className='text-muted-foreground h-7 gap-1 px-2 text-xs'
+      onClick={() => setIsEditingDoc(true)}
+    >
+      <FileText className='size-3.5' />
+      {t('Edit API document')}
+    </Button>
+  )
+
+  if (docContent) {
+    return (
+      <div className='space-y-2'>
+        <div className='flex justify-end'>{editButton}</div>
+        <ModelApiDoc content={docContent} />
+      </div>
+    )
+  }
+
   return (
     <div className='space-y-6'>
+      {editButton && <div className='flex justify-end'>{editButton}</div>}
       <CodeSamplesSection
         model={props.model}
         endpointMap={props.endpointMap}

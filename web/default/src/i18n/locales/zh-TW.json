@@ -1076,6 +1076,7 @@
     "Copied: {{model}}": "已複製: {{model}}",
     "Copied!": "已複製！",
     "Copy": "複製",
+    "Copy Markdown": "複製 Markdown",
     "Copy {{name}} pricing": "複製 {{name}} 定價",
     "Copy a request header": "複製請求頭",
     "Copy All": "全部複製",
@@ -5236,6 +5237,12 @@
     "Zero retention": "零數據保留",
     "Zhipu": "智譜",
     "Zhipu V4": "智譜 V4",
-    "Zoom": "縮放"
+    "Zoom": "縮放",
+    "Task Details": "任務詳情",
+    "View the complete details for this task": "檢視該任務的完整詳情",
+    "Edit API document": "編輯 API 文件",
+    "Failed to save API documentation": "儲存 API 文件失敗",
+    "API documentation saved": "API 文件已儲存",
+    "Edit API documentation": "編輯 API 文件"
   }
 }

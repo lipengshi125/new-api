@@ -1076,6 +1076,7 @@
     "Copied: {{model}}": "Скопировано: {{model}}",
     "Copied!": "Скопировано!",
     "Copy": "Копировать",
+    "Copy Markdown": "Копировать Markdown",
     "Copy {{name}} pricing": "Копировать тариф {{name}}",
     "Copy a request header": "Копировать заголовок запроса",
     "Copy All": "Скопировать все",
@@ -5236,6 +5237,12 @@
     "Zero retention": "Без хранения данных",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Task Details": "Детали задачи",
+    "View the complete details for this task": "Просмотр полной информации о задаче",
+    "Edit API document": "Редактировать документ API",
+    "Failed to save API documentation": "Не удалось сохранить документацию API",
+    "API documentation saved": "Документация API сохранена",
+    "Edit API documentation": "Редактировать документацию API"
   }
 }

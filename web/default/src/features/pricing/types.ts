@@ -67,6 +67,11 @@ export type PricingModel = {
    */
   code_samples?: CodeSampleMap
   /**
+   * True when an admin-authored Markdown document replaces the generated API
+   * panel. The document is fetched separately via getModelApiDoc.
+   */
+  has_api_doc?: boolean
+  /**
    * Optional model metadata fields reserved for backend-provided catalog data.
    * Keep them data-driven; do not synthesize display values on the client.
    */

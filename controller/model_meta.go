@@ -194,6 +194,44 @@ func UpdateModelCodeSamples(c *gin.Context) {
 	})
 }
 
+// GetModelAPIDoc 返回指定模型的 Markdown API 文档；未配置时 content 为空，
+// 前端据此回退到自动生成的四个区块。
+func GetModelAPIDoc(c *gin.Context) {
+	modelName := strings.TrimSpace(c.Query("model_name"))
+	if modelName == "" {
+		common.ApiErrorMsg(c, "模型名称不能为空")
+		return
+	}
+	doc, ok, err := model.GetModelAPIDoc(modelName)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if !ok {
+		doc.ModelName = modelName
+	}
+	common.ApiSuccess(c, doc)
+}
+
+// UpdateModelAPIDoc 保存指定模型的 Markdown API 文档（按模型名定位）。
+// 内容为空即删除，恢复自动生成的 API 面板。
+func UpdateModelAPIDoc(c *gin.Context) {
+	var req struct {
+		ModelName string `json:"model_name"`
+		Content   string `json:"content"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if err := model.SaveModelAPIDoc(req.ModelName, req.Content); err != nil {
+		common.ApiErrorMsg(c, err.Error())
+		return
+	}
+	model.InvalidatePricingCache()
+	common.ApiSuccess(c, gin.H{"model_name": strings.TrimSpace(req.ModelName)})
+}
+
 // DeleteModelMeta 删除模型
 func DeleteModelMeta(c *gin.Context) {
 	idStr := c.Param("id")

@@ -1076,6 +1076,7 @@
     "Copied: {{model}}": "コピーしました: {{model}}",
     "Copied!": "コピーしました！",
     "Copy": "コピー",
+    "Copy Markdown": "Markdown をコピー",
     "Copy {{name}} pricing": "{{name}} の料金をコピー",
     "Copy a request header": "リクエストヘッダーをコピー",
     "Copy All": "すべてコピー",
@@ -5236,6 +5237,12 @@
     "Zero retention": "データ保持なし",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V 4",
-    "Zoom": "ズーム"
+    "Zoom": "ズーム",
+    "Task Details": "タスク詳細",
+    "View the complete details for this task": "このタスクの詳細をすべて表示",
+    "Edit API document": "API ドキュメントを編集",
+    "Failed to save API documentation": "API ドキュメントの保存に失敗しました",
+    "API documentation saved": "API ドキュメントを保存しました",
+    "Edit API documentation": "API ドキュメントを編集"
   }
 }

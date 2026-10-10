@@ -1076,6 +1076,7 @@
     "Copied: {{model}}": "Copié : {{model}}",
     "Copied!": "Copié !",
     "Copy": "Copier",
+    "Copy Markdown": "Copier le Markdown",
     "Copy {{name}} pricing": "Copier la tarification de {{name}}",
     "Copy a request header": "Copier un en-tête de requête",
     "Copy All": "Tout copier",
@@ -5236,6 +5237,12 @@
     "Zero retention": "Aucune rétention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Task Details": "Détails de la tâche",
+    "View the complete details for this task": "Voir les détails complets de cette tâche",
+    "Edit API document": "Modifier le document API",
+    "Failed to save API documentation": "Échec de l'enregistrement de la documentation API",
+    "API documentation saved": "Documentation API enregistrée",
+    "Edit API documentation": "Modifier la documentation API"
   }
 }
