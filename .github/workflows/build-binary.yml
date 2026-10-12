@@ -1,0 +1,90 @@
+name: Build Binary (main)
+
+# 每次 push 到 main 时构建 linux/amd64 二进制，并发布到固定的 latest-build Release，
+# 服务器直接下载即可，无需在本地/服务器上构建。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-binary-main
+  cancel-in-progress: true
+
+env:
+  RELEASE_TAG: latest-build
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.1'
+          cache: true
+
+      # VERSION 文件为空时用短 sha 兜底，避免版本号为空
+      - name: Resolve version
+        id: ver
+        run: |
+          V=$(tr -d '[:space:]' < VERSION 2>/dev/null || true)
+          if [ -z "$V" ]; then V="dev-$(git rev-parse --short HEAD)"; fi
+          echo "value=$V" >> "$GITHUB_OUTPUT"
+          echo "version = $V"
+
+      # 与 Dockerfile 一致：在 web/ 根目录安装 workspace 依赖
+      - name: Install frontend dependencies
+        working-directory: web
+        run: bun install --frozen-lockfile
+
+      - name: Build default frontend
+        working-directory: web/default
+        env:
+          DISABLE_ESLINT_PLUGIN: 'true'
+          VITE_REACT_APP_VERSION: ${{ steps.ver.outputs.value }}
+        run: bun run build
+
+      - name: Build classic frontend
+        working-directory: web/classic
+        env:
+          VITE_REACT_APP_VERSION: ${{ steps.ver.outputs.value }}
+        run: bun run build
+
+      - name: Build Go binary
+        env:
+          CGO_ENABLED: '0'
+          GOOS: linux
+          GOARCH: amd64
+          GOEXPERIMENT: greenteagc
+        run: |
+          go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=${{ steps.ver.outputs.value }}'" -o new-api
+          sha256sum new-api > new-api.sha256
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: new-api-linux-amd64
+          path: |
+            new-api
+            new-api.sha256
+
+      # 覆盖固定 tag 的 Release，下载地址保持不变
+      - name: Publish latest-build release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete "$RELEASE_TAG" --cleanup-tag --yes || true
+          gh release create "$RELEASE_TAG" new-api new-api.sha256 \
+            --target "${{ github.sha }}" \
+            --title "Latest build ${{ steps.ver.outputs.value }}" \
+            --notes "Auto build from ${{ github.sha }}" \
+            --prerelease

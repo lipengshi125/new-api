@@ -24,32 +24,29 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 )
 
+// ObjectImage is the object value of async image tasks, mirroring "video" for
+// /v1/videos.
+const ObjectImage = "image"
+
 // submitResponse models the upstream submit/fetch payload. Upstreams differ on
-// where the id lives, so several spellings are accepted.
+// where the id and result URL live, so several spellings are accepted.
 type submitResponse struct {
 	ID     string `json:"id"`
 	TaskID string `json:"task_id,omitempty"`
-	Object string `json:"object,omitempty"`
-	Model  string `json:"model,omitempty"`
 	Status string `json:"status,omitempty"`
 
-	Progress  int     `json:"progress,omitempty"`
-	CreatedAt int64   `json:"created_at,omitempty"`
-	Size      string  `json:"size,omitempty"`
-	Data      []datum `json:"data,omitempty"`
+	Progress  int    `json:"progress,omitempty"`
+	CreatedAt int64  `json:"created_at,omitempty"`
+	Size      string `json:"size,omitempty"`
 
 	Error *struct {
 		Message string `json:"message"`
 		Code    string `json:"code"`
 	} `json:"error,omitempty"`
-}
-
-type datum struct {
-	URL           string `json:"url,omitempty"`
-	B64JSON       string `json:"b64_json,omitempty"`
-	RevisedPrompt string `json:"revised_prompt,omitempty"`
 }
 
 type TaskAdaptor struct {
@@ -142,9 +139,9 @@ func (a *TaskAdaptor) DoResponse(c *gin.Context, resp *http.Response, info *rela
 		return
 	}
 
-	// 返回 OpenAI video 格式：图片与视频任务共用一套响应结构，
-	// 客户端可以用同一段轮询逻辑处理两者。
+	// 与 /v1/videos 共用一套响应结构，object 为 image。
 	out := dto.NewOpenAIVideo()
+	out.Object = ObjectImage
 	out.ID = info.PublicTaskID
 	out.TaskID = info.PublicTaskID
 	out.Model = info.OriginModelName
@@ -205,7 +202,7 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 		info.Status = model.TaskStatusQueued
 	case dto.VideoStatusCompleted:
 		info.Status = model.TaskStatusSuccess
-		info.Url = firstImageURL(parsed.Data)
+		info.Url = resultImageURL(gjson.ParseBytes(respBody))
 	case dto.VideoStatusFailed:
 		info.Status = model.TaskStatusFailure
 		if parsed.Error != nil && parsed.Error.Message != "" {
@@ -223,60 +220,53 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 	return info, nil
 }
 
-// ConvertToOpenAIVideo renders a stored image task in the OpenAI video shape.
-// Image and video tasks share one response format so /v1/videos/{id} and
-// /v1/images/{id} are interchangeable aliases for the same query endpoint.
-// The result URL is carried in metadata.url, matching every other adaptor.
+// ConvertToOpenAIVideo returns the stored upstream payload as-is, the same
+// passthrough /v1/videos/{id} uses, with the upstream id swapped for the public
+// task id. metadata.url is the real image URL reported upstream, never the local
+// /v1/videos/{id}/content proxy. The relay layer sets object from the request
+// path, so /v1/images/{id} reports "image" and /v1/videos/{id} reports "video".
 func (a *TaskAdaptor) ConvertToOpenAIVideo(task *model.Task) ([]byte, error) {
-	out := dto.NewOpenAIVideo()
-	out.ID = task.TaskID
-	out.TaskID = task.TaskID
-	out.Model = task.Properties.OriginModelName
-	out.Status = task.Status.ToVideoStatus()
-	out.SetProgressStr(task.Progress)
-	out.CreatedAt = task.CreatedAt
-	if task.FinishTime > 0 {
+	data := []byte(task.Data)
+	if !gjson.ValidBytes(data) || !gjson.ParseBytes(data).IsObject() {
+		// No usable upstream payload (task not polled yet): synthesize the shape.
+		out := dto.NewOpenAIVideo()
+		out.Object = ObjectImage
+		out.Model = task.Properties.OriginModelName
+		out.SetProgressStr(task.Progress)
+		out.CreatedAt = task.CreatedAt
 		out.CompletedAt = task.FinishTime
-	} else if task.UpdatedAt > 0 {
-		out.CompletedAt = task.UpdatedAt
+		var err error
+		if data, err = common.Marshal(out); err != nil {
+			return nil, err
+		}
 	}
 
-	// Prefer the first image URL the upstream reported; fall back to the stored
-	// result URL when the payload is unavailable or unparseable.
-	var stored submitResponse
-	if err := common.Unmarshal(task.Data, &stored); err == nil {
-		if stored.Size != "" {
-			out.Size = stored.Size
-		}
-		if url := firstImageURL(stored.Data); url != "" {
-			out.SetMetadata("url", url)
-		}
-		if len(stored.Data) > 1 {
-			urls := make([]string, 0, len(stored.Data))
-			for _, d := range stored.Data {
-				if d.URL != "" {
-					urls = append(urls, d.URL)
-				}
-			}
-			if len(urls) > 1 {
-				out.SetMetadata("urls", urls)
+	var err error
+	if data, err = sjson.SetBytes(data, "id", task.TaskID); err != nil {
+		return nil, errors.Wrap(err, "set id failed")
+	}
+	if data, err = sjson.SetBytes(data, "task_id", task.TaskID); err != nil {
+		return nil, errors.Wrap(err, "set task_id failed")
+	}
+	if data, err = sjson.SetBytes(data, "status", task.Status.ToVideoStatus()); err != nil {
+		return nil, errors.Wrap(err, "set status failed")
+	}
+
+	if gjson.GetBytes(data, "metadata.url").String() == "" {
+		if url := ResultURL(task); url != "" {
+			if data, err = sjson.SetBytes(data, "metadata.url", url); err != nil {
+				return nil, errors.Wrap(err, "set metadata.url failed")
 			}
 		}
 	}
-	if _, ok := out.Metadata["url"]; !ok {
-		if url := task.GetResultURL(); url != "" {
-			out.SetMetadata("url", url)
+
+	if task.Status == model.TaskStatusFailure && !gjson.GetBytes(data, "error").Exists() {
+		failure := dto.OpenAIVideoError{Message: task.FailReason, Code: "task_failed"}
+		if data, err = sjson.SetBytes(data, "error", failure); err != nil {
+			return nil, errors.Wrap(err, "set error failed")
 		}
 	}
-
-	if task.Status == model.TaskStatusFailure {
-		out.Error = &dto.OpenAIVideoError{
-			Message: task.FailReason,
-			Code:    "task_failed",
-		}
-	}
-
-	return common.Marshal(out)
+	return data, nil
 }
 
 // mapUpstreamStatus normalizes the status spellings seen across upstreams onto
@@ -296,10 +286,38 @@ func mapUpstreamStatus(status string) string {
 	return ""
 }
 
-func firstImageURL(data []datum) string {
-	for _, d := range data {
-		if d.URL != "" {
-			return d.URL
+// ResultURL returns the real image URL of an image task: the URL the upstream
+// reported in the stored payload, else the stored result URL unless that is only
+// the local content proxy (/v1/videos|images/{id}/content), which would loop
+// back to this service instead of reaching the image.
+func ResultURL(task *model.Task) string {
+	if gjson.ValidBytes(task.Data) {
+		if url := resultImageURL(gjson.ParseBytes(task.Data)); url != "" {
+			return url
+		}
+	}
+	url := strings.TrimSpace(task.PrivateData.ResultURL)
+	if url == "" || strings.Contains(url, "/"+task.TaskID+"/content") {
+		return ""
+	}
+	return url
+}
+
+// resultImageURL finds the image URL in an upstream payload. Upstreams report
+// it as metadata.url, data.url (object) or data[].url (OpenAI image list).
+func resultImageURL(payload gjson.Result) string {
+	for _, path := range []string{"metadata.url", "data.url", "data.#.url", "url", "image_url"} {
+		value := payload.Get(path)
+		if value.IsArray() {
+			for _, item := range value.Array() {
+				if url := strings.TrimSpace(item.String()); url != "" {
+					return url
+				}
+			}
+			continue
+		}
+		if url := strings.TrimSpace(value.String()); url != "" {
+			return url
 		}
 	}
 	return ""

@@ -21,6 +21,7 @@ import (
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/sjson"
 )
 
 type TaskSubmitResult struct {
@@ -425,7 +426,15 @@ func videoFetchByIDRespBodyBuilder(c *gin.Context) (respBody []byte, taskResp *d
 				taskResp = service.TaskErrorWrapper(err, "convert_to_openai_video_failed", http.StatusInternalServerError)
 				return
 			}
-			respBody = openAIVideoData
+			// object 由请求路径决定：/v1/images 为 image，/v1/videos 为 video。
+			object := "video"
+			if strings.HasPrefix(c.Request.RequestURI, "/v1/images/") {
+				object = "image"
+			}
+			respBody, err = sjson.SetBytes(openAIVideoData, "object", object)
+			if err != nil {
+				taskResp = service.TaskErrorWrapper(err, "convert_to_openai_video_failed", http.StatusInternalServerError)
+			}
 			return
 		}
 		taskResp = service.TaskErrorWrapperLocal(fmt.Errorf("not_implemented:%s", originTask.Platform), "not_implemented", http.StatusNotImplemented)

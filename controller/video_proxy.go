@@ -14,6 +14,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
+	taskimage "github.com/QuantumNous/new-api/relay/channel/task/image"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 
@@ -89,8 +90,16 @@ func VideoProxy(c *gin.Context) {
 		return
 	}
 
-	switch channel.Type {
-	case constant.ChannelTypeGemini:
+	switch {
+	case task.Platform == constant.TaskPlatformImage:
+		// 图片任务：上游没有 /v1/videos/{id}/content，直接拉取上游给出的真实图片地址。
+		videoURL = taskimage.ResultURL(task)
+		if videoURL == "" {
+			// 结果里没有地址时，回退到上游自己的图片 content 端点。
+			videoURL = fmt.Sprintf("%s/v1/images/%s/content", baseURL, task.GetUpstreamTaskID())
+			req.Header.Set("Authorization", "Bearer "+channel.Key)
+		}
+	case channel.Type == constant.ChannelTypeGemini:
 		apiKey := task.PrivateData.Key
 		if apiKey == "" {
 			logger.LogError(c.Request.Context(), fmt.Sprintf("Missing stored API key for Gemini task %s", taskID))
@@ -104,14 +113,14 @@ func VideoProxy(c *gin.Context) {
 			return
 		}
 		req.Header.Set("x-goog-api-key", apiKey)
-	case constant.ChannelTypeVertexAi:
+	case channel.Type == constant.ChannelTypeVertexAi:
 		videoURL, err = getVertexVideoURL(channel, task)
 		if err != nil {
 			logger.LogError(c.Request.Context(), fmt.Sprintf("Failed to resolve Vertex video URL for task %s: %s", taskID, err.Error()))
 			videoProxyError(c, http.StatusBadGateway, "server_error", "Failed to resolve Vertex video URL")
 			return
 		}
-	case constant.ChannelTypeOpenAI, constant.ChannelTypeSora:
+	case channel.Type == constant.ChannelTypeOpenAI || channel.Type == constant.ChannelTypeSora:
 		// 若已存储真实结果地址（且不是指向本服务自身的代理端点），优先直连，
 		// 避免再走上游 /content 代理（可能带鉴权/防盗链导致浏览器无法播放）。
 		if resultURL := strings.TrimSpace(task.GetResultURL()); resultURL != "" && !isTaskProxyContentURL(resultURL, taskID) {

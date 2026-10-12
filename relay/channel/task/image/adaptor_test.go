@@ -7,6 +7,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/relay/channel/task/taskcommon"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,6 +46,12 @@ func TestParseTaskResultStatusMapping(t *testing.T) {
 			body:       `{"id":"x","status":"completed","data":[{"url":"https://cdn.example.com/1.png"}]}`,
 			wantStatus: model.TaskStatusSuccess,
 			wantURL:    "https://cdn.example.com/1.png",
+		},
+		{
+			name:       "completed exposes metadata url",
+			body:       `{"id":"x","status":"completed","data":{"duration":6750000},"metadata":{"url":"https://cdn.example.com/1.jpg"}}`,
+			wantStatus: model.TaskStatusSuccess,
+			wantURL:    "https://cdn.example.com/1.jpg",
 		},
 		{
 			name:       "succeeded alias",
@@ -86,53 +93,64 @@ func TestParseTaskResultStatusMapping(t *testing.T) {
 	}
 }
 
-// TestConvertToOpenAIVideo verifies an image task renders in the OpenAI video
-// shape, so /v1/images/{id} and /v1/videos/{id} return one interchangeable
-// format. It also pins that the upstream id never leaks to the client.
+// TestConvertToOpenAIVideo verifies a stored image task is returned as the
+// upstream payload (same passthrough as /v1/videos/{id}) with the public id,
+// and that metadata.url is the real image URL, never the local content proxy.
 func TestConvertToOpenAIVideo(t *testing.T) {
 	adaptor := &TaskAdaptor{}
 
-	t.Run("success exposes public id and result url in metadata", func(t *testing.T) {
+	t.Run("success passes upstream payload through with public id", func(t *testing.T) {
 		task := &model.Task{
 			TaskID:     "task_public123",
 			Status:     model.TaskStatusSuccess,
-			Progress:   "100%",
-			CreatedAt:  1000,
 			FinishTime: 1200,
-			Data:       json.RawMessage(`{"id":"upstream_secret","size":"1024x1024","data":[{"url":"https://cdn.example.com/a.png"}]}`),
+			Data: json.RawMessage(`{"id":"upstream_secret","task_id":"upstream_secret","object":"video","model":"banana-2",` +
+				`"status":"completed","progress":100,"created_at":1000,"completed_at":1200,"seconds":"5",` +
+				`"data":{"duration":6750000},"metadata":{"url":"https://cdn.example.com/a.jpg"}}`),
 		}
-		task.Properties.OriginModelName = "image-2.5-sunburst"
+		task.PrivateData.ResultURL = "https://cdn.example.com/a.jpg"
+
+		raw, err := adaptor.ConvertToOpenAIVideo(task)
+		require.NoError(t, err)
+
+		var got map[string]any
+		require.NoError(t, common.Unmarshal(raw, &got))
+		assert.NotContains(t, string(raw), "upstream_secret")
+		assert.Equal(t, "task_public123", got["id"])
+		assert.Equal(t, "task_public123", got["task_id"])
+		assert.Equal(t, "banana-2", got["model"])
+		assert.Equal(t, dto.VideoStatusCompleted, got["status"])
+		assert.Equal(t, "5", got["seconds"])
+		assert.Equal(t, map[string]any{"duration": float64(6750000)}, got["data"])
+		assert.Equal(t, map[string]any{"url": "https://cdn.example.com/a.jpg"}, got["metadata"])
+	})
+
+	t.Run("openai image list fills metadata url", func(t *testing.T) {
+		task := &model.Task{
+			TaskID: "task_list",
+			Status: model.TaskStatusSuccess,
+			Data:   json.RawMessage(`{"status":"completed","data":[{"url":"https://cdn.example.com/a.png"},{"url":"https://cdn.example.com/b.png"}]}`),
+		}
 
 		raw, err := adaptor.ConvertToOpenAIVideo(task)
 		require.NoError(t, err)
 
 		var got dto.OpenAIVideo
 		require.NoError(t, common.Unmarshal(raw, &got))
-
-		assert.Equal(t, "task_public123", got.ID)
-		assert.NotContains(t, string(raw), "upstream_secret")
-		assert.Equal(t, "image-2.5-sunburst", got.Model)
-		assert.Equal(t, dto.VideoStatusCompleted, got.Status)
-		assert.Equal(t, "1024x1024", got.Size)
-		assert.Equal(t, int64(1200), got.CompletedAt)
-		assert.Equal(t, 100, got.Progress)
 		assert.Equal(t, "https://cdn.example.com/a.png", got.Metadata["url"])
 	})
 
-	t.Run("multiple images expose a urls list alongside url", func(t *testing.T) {
+	t.Run("local content proxy url is never exposed", func(t *testing.T) {
 		task := &model.Task{
-			TaskID: "task_multi",
+			TaskID: "task_proxy",
 			Status: model.TaskStatusSuccess,
-			Data:   json.RawMessage(`{"data":[{"url":"https://cdn.example.com/a.png"},{"url":"https://cdn.example.com/b.png"}]}`),
+			Data:   json.RawMessage(`{"status":"completed"}`),
 		}
+		task.PrivateData.ResultURL = taskcommon.BuildProxyURL("task_proxy")
 
 		raw, err := adaptor.ConvertToOpenAIVideo(task)
 		require.NoError(t, err)
-
-		var got dto.OpenAIVideo
-		require.NoError(t, common.Unmarshal(raw, &got))
-		assert.Equal(t, "https://cdn.example.com/a.png", got.Metadata["url"])
-		assert.Equal(t, []any{"https://cdn.example.com/a.png", "https://cdn.example.com/b.png"}, got.Metadata["urls"])
+		assert.NotContains(t, string(raw), "/content")
 	})
 
 	t.Run("success falls back to stored result url", func(t *testing.T) {
@@ -186,4 +204,29 @@ func TestConvertToOpenAIVideo(t *testing.T) {
 		assert.Empty(t, got.Metadata["url"])
 		assert.Nil(t, got.Error)
 	})
+}
+
+// TestResultURL pins the URL the content proxy fetches for an image task: the
+// real upstream image URL, never the local content proxy, which would loop back
+// to this service (and to an upstream /v1/videos/{id}/content that 404s).
+func TestResultURL(t *testing.T) {
+	tests := []struct {
+		name      string
+		data      string
+		resultURL string
+		want      string
+	}{
+		{"metadata url wins", `{"metadata":{"url":"https://cdn.example.com/a.jpg"}}`, "https://other.example.com/b.jpg", "https://cdn.example.com/a.jpg"},
+		{"openai image list", `{"data":[{"url":"https://cdn.example.com/a.png"}]}`, "", "https://cdn.example.com/a.png"},
+		{"stored result url fallback", `{"status":"completed"}`, "https://cdn.example.com/c.png", "https://cdn.example.com/c.png"},
+		{"local video proxy is rejected", `{"status":"completed"}`, "https://api.example.com/v1/videos/task_x/content", ""},
+		{"local image proxy is rejected", `{"status":"completed"}`, "https://api.example.com/v1/images/task_x/content", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			task := &model.Task{TaskID: "task_x", Data: json.RawMessage(tt.data)}
+			task.PrivateData.ResultURL = tt.resultURL
+			assert.Equal(t, tt.want, ResultURL(task))
+		})
+	}
 }
