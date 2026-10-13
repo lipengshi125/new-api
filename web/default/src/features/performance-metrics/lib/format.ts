@@ -41,15 +41,15 @@ export type SuccessRateLevel =
   | 'unknown'
 
 const SUCCESS_RATE_EXCELLENT_MIN = 100
-const SUCCESS_RATE_GOOD_MIN = 90
-const SUCCESS_RATE_WARNING_MIN = 70
+const SUCCESS_RATE_GOOD_MIN = 40
+const SUCCESS_RATE_WARNING_MIN = 10
 
 /**
  * Single source of truth for grading a success rate (0-100).
  * - excellent: 100% (full green)
- * - good: >= 90% (slightly lighter green)
- * - warning: >= 70%
- * - critical: below 70%
+ * - good: >= 40% (slightly lighter green)
+ * - warning: >= 10%
+ * - critical: below 10%
  * - unknown: non-finite values
  */
 export function getSuccessRateLevel(rate: number): SuccessRateLevel {

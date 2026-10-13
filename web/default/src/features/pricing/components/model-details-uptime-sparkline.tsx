@@ -16,7 +16,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Activity, AlertCircle, CheckCircle2 } from 'lucide-react'
+import {
+  Activity,
+  AlertCircle,
+  CheckCircle2,
+  type LucideIcon,
+} from 'lucide-react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -28,7 +33,9 @@ import {
 import {
   formatUptimePct,
   getSuccessRateDotClass,
+  getSuccessRateLevel,
   getSuccessRateTextClass,
+  type SuccessRateLevel,
 } from '@/features/performance-metrics/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -56,12 +63,17 @@ type UptimeSparklineProps = {
   className?: string
 }
 
+// Height follows the same grading as the bar colour.
+const HEIGHT_BY_LEVEL: Record<SuccessRateLevel, string> = {
+  excellent: 'h-full',
+  good: 'h-[75%]',
+  warning: 'h-[55%]',
+  critical: 'h-[40%]',
+  unknown: 'h-[40%]',
+}
+
 function heightFor(uptime: number): string {
-  if (uptime >= 99.9) return 'h-full'
-  if (uptime >= 99.0) return 'h-[88%]'
-  if (uptime >= 95.0) return 'h-[72%]'
-  if (uptime >= 90.0) return 'h-[55%]'
-  return 'h-[40%]'
+  return HEIGHT_BY_LEVEL[getSuccessRateLevel(uptime)]
 }
 
 export function UptimeSparkline(props: UptimeSparklineProps) {
@@ -143,43 +155,28 @@ export function UptimeSparkline(props: UptimeSparklineProps) {
 // Uptime status row — sparkline + summary text + status icon
 // ---------------------------------------------------------------------------
 
+const STATUS_BY_LEVEL: Record<
+  SuccessRateLevel,
+  { icon: LucideIcon; labelKey: string }
+> = {
+  excellent: { icon: CheckCircle2, labelKey: 'All systems operational' },
+  good: { icon: Activity, labelKey: 'Minor blips in the last 30 days' },
+  warning: { icon: AlertCircle, labelKey: 'Degraded performance recently' },
+  critical: { icon: AlertCircle, labelKey: 'Significant outages detected' },
+  unknown: { icon: AlertCircle, labelKey: 'Significant outages detected' },
+}
+
 export function UptimeStatusRow(props: {
   series: UptimeDayPoint[]
   className?: string
 }) {
   const { t } = useTranslation()
   const summary = useMemo(() => aggregateUptime(props.series), [props.series])
-  const status = useMemo(() => {
-    if (summary.uptime_pct >= 99.9) return 'operational'
-    if (summary.uptime_pct >= 99.0) return 'minor'
-    if (summary.uptime_pct >= 95.0) return 'degraded'
-    return 'major'
-  }, [summary.uptime_pct])
-
-  const StatusIcon =
-    status === 'operational'
-      ? CheckCircle2
-      : status === 'minor'
-        ? Activity
-        : AlertCircle
-
-  const statusColour =
-    status === 'operational'
-      ? 'text-emerald-600 dark:text-emerald-400'
-      : status === 'minor'
-        ? 'text-emerald-600 dark:text-emerald-400'
-        : status === 'degraded'
-          ? 'text-amber-600 dark:text-amber-400'
-          : 'text-rose-600 dark:text-rose-400'
-
-  const statusLabel =
-    status === 'operational'
-      ? t('All systems operational')
-      : status === 'minor'
-        ? t('Minor blips in the last 30 days')
-        : status === 'degraded'
-          ? t('Degraded performance recently')
-          : t('Significant outages detected')
+  // Same grading as the bar colours, so the label never disagrees with them.
+  const status = STATUS_BY_LEVEL[getSuccessRateLevel(summary.uptime_pct)]
+  const StatusIcon = status.icon
+  const statusColour = getSuccessRateTextClass(summary.uptime_pct)
+  const statusLabel = t(status.labelKey)
 
   return (
     <div
