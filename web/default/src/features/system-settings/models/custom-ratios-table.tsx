@@ -22,11 +22,23 @@ import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 
 import {
+  CUSTOM_RATIO_MATCH_ANY,
+  CUSTOM_RATIO_MATCH_PER_ITEM,
   flattenCustomRatios,
+  getCustomRatioMatchMode,
   unflattenCustomRatios,
+  type CustomRatioMatchMode,
   type FlatRatioRow,
 } from './model-pricing-core'
 
@@ -37,6 +49,14 @@ type CustomRatiosTableProps = {
 
 export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
   const { t } = useTranslation()
+  const matchModeOptions: Array<{
+    value: CustomRatioMatchMode
+    label: string
+  }> = [
+    { value: 'exact', label: t('Exact value') },
+    { value: 'any', label: t('Any value') },
+    { value: 'per_item', label: t('Per item') },
+  ]
   // 本组件自持行状态：行的 id 由本地稳定分配，永不从内容派生，
   // 避免编辑时因 id 变化触发 <Input> 卸载重挂而丢失焦点。
   // 切换模型时通过调用处的 key={editorReloadToken} 重新挂载来重新播种。
@@ -100,13 +120,26 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
     [rows, handleRowsChange]
   )
 
-  // 验证参数名格式
+  // 切换匹配方式：任意值/按个数使用保留参数值，切回精确值时清空让用户重新填写
+  const handleMatchModeChange = useCallback(
+    (id: string, mode: CustomRatioMatchMode) => {
+      let paramValue = ''
+      if (mode === 'any') paramValue = CUSTOM_RATIO_MATCH_ANY
+      if (mode === 'per_item') paramValue = CUSTOM_RATIO_MATCH_PER_ITEM
+      handleRowsChange(
+        rows.map((row) => (row.id === id ? { ...row, paramValue } : row))
+      )
+    },
+    [rows, handleRowsChange]
+  )
+
+  // 验证参数名格式（允许点号以访问嵌套字段，如 input.images）
   const validateParamName = useCallback(
     (name: string): string | null => {
       if (!name.trim()) return t('Parameter name is required')
-      if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+      if (!/^[a-zA-Z0-9_.-]+$/.test(name)) {
         return t(
-          'Parameter name can only contain letters, numbers, underscores and hyphens'
+          'Parameter name can only contain letters, numbers, underscores, hyphens and dots'
         )
       }
       return null
@@ -135,11 +168,7 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
 
   // 检查重复的参数名+参数值组合
   const checkDuplicate = useCallback(
-    (
-      paramName: string,
-      paramValue: string,
-      currentId: string
-    ): boolean => {
+    (paramName: string, paramValue: string, currentId: string): boolean => {
       return rows.some(
         (row) =>
           row.id !== currentId &&
@@ -169,9 +198,14 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
         <h3 className='text-sm font-semibold'>
           {t('Custom Parameter Multipliers')}
         </h3>
-        <p className='text-muted-foreground text-xs mt-1'>
+        <p className='text-muted-foreground mt-1 text-xs'>
           {t(
             'Configure request parameter multipliers. Multiple multipliers will be multiplied together.'
+          )}
+        </p>
+        <p className='text-muted-foreground mt-1 text-xs'>
+          {t(
+            'Exact value: applies when the parameter equals the value. Any value: applies whenever the parameter is present and non-empty. Per item: multiplier × item count (array length; a non-empty single value counts as 1; capped at 128). Use dots for nested fields, e.g. input.images.'
           )}
         </p>
       </div>
@@ -191,8 +225,9 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
 
       <div className='rounded-lg border'>
         {/* 表格头 */}
-        <div className='grid grid-cols-[1fr_1fr_120px_60px] gap-4 border-b bg-muted/50 px-4 py-2 text-xs font-semibold'>
+        <div className='bg-muted/50 grid grid-cols-[1fr_130px_1fr_120px_60px] gap-4 border-b px-4 py-2 text-xs font-semibold'>
           <div>{t('Parameter Name')}</div>
+          <div>{t('Match')}</div>
           <div>{t('Parameter Value')}</div>
           <div>{t('Multiplier')}</div>
           <div>{t('Actions')}</div>
@@ -205,35 +240,27 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
           </div>
         ) : (
           <div className='divide-y'>
-            {rows.map((row, index) => (
-              <div key={row.id}>
-                <div
-                  className={cn(
-                    'grid grid-cols-[1fr_1fr_120px_60px] gap-4 px-4 py-2',
-                    getRowBackground(row.paramName)
-                  )}
-                >
-                  {/* 参数名列 */}
-                  <div className='flex items-center'>
-                    {isFirstRowOfParam(index) ? (
-                      <Input
-                        value={row.paramName}
-                        onChange={(e) =>
-                          handleFieldChange(row.id, 'paramName', e.target.value)
-                        }
-                        placeholder={t('Parameter Name')}
-                        className={cn(
-                          'h-8',
-                          getRowErrors(row).paramName && 'border-red-500'
-                        )}
-                      />
-                    ) : (
-                      <div className='flex items-center gap-2'>
-                        <span className='text-muted-foreground'>↳</span>
+            {rows.map((row, index) => {
+              const matchMode = getCustomRatioMatchMode(row.paramValue)
+              return (
+                <div key={row.id}>
+                  <div
+                    className={cn(
+                      'grid grid-cols-[1fr_130px_1fr_120px_60px] gap-4 px-4 py-2',
+                      getRowBackground(row.paramName)
+                    )}
+                  >
+                    {/* 参数名列 */}
+                    <div className='flex items-center'>
+                      {isFirstRowOfParam(index) ? (
                         <Input
                           value={row.paramName}
                           onChange={(e) =>
-                            handleFieldChange(row.id, 'paramName', e.target.value)
+                            handleFieldChange(
+                              row.id,
+                              'paramName',
+                              e.target.value
+                            )
                           }
                           placeholder={t('Parameter Name')}
                           className={cn(
@@ -241,87 +268,158 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
                             getRowErrors(row).paramName && 'border-red-500'
                           )}
                         />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 参数值列 */}
-                  <div className='flex items-center'>
-                    <Input
-                      value={row.paramValue}
-                      onChange={(e) =>
-                        handleFieldChange(row.id, 'paramValue', e.target.value)
-                      }
-                      placeholder={t('Parameter Value')}
-                      className={cn(
-                        'h-8',
-                        getRowErrors(row).paramValue && 'border-red-500'
+                      ) : (
+                        <div className='flex items-center gap-2'>
+                          <span className='text-muted-foreground'>↳</span>
+                          <Input
+                            value={row.paramName}
+                            onChange={(e) =>
+                              handleFieldChange(
+                                row.id,
+                                'paramName',
+                                e.target.value
+                              )
+                            }
+                            placeholder={t('Parameter Name')}
+                            className={cn(
+                              'h-8',
+                              getRowErrors(row).paramName && 'border-red-500'
+                            )}
+                          />
+                        </div>
                       )}
-                    />
-                  </div>
+                    </div>
 
-                  {/* 倍率列 */}
-                  <div className='flex items-center'>
-                    <Input
-                      type='number'
-                      step='0.01'
-                      min='0.01'
-                      value={row.ratio}
-                      onChange={(e) =>
-                        handleFieldChange(row.id, 'ratio', parseFloat(e.target.value) || 0)
-                      }
-                      placeholder='1.0'
-                      className={cn(
-                        'h-8',
-                        getRowErrors(row).ratio && 'border-red-500'
+                    {/* 匹配方式列 */}
+                    <div className='flex items-center'>
+                      <Select
+                        items={matchModeOptions}
+                        value={matchMode}
+                        onValueChange={(v) =>
+                          v !== null && handleMatchModeChange(row.id, v)
+                        }
+                      >
+                        <SelectTrigger
+                          className='h-8 w-full'
+                          aria-label={t('Match')}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent alignItemWithTrigger={false}>
+                          <SelectGroup>
+                            {matchModeOptions.map((option) => (
+                              <SelectItem
+                                key={option.value}
+                                value={option.value}
+                              >
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* 参数值列：任意值/按个数模式无需填写参数值 */}
+                    <div className='flex items-center'>
+                      {matchMode === 'exact' ? (
+                        <Input
+                          value={row.paramValue}
+                          onChange={(e) =>
+                            handleFieldChange(
+                              row.id,
+                              'paramValue',
+                              e.target.value
+                            )
+                          }
+                          placeholder={t('Parameter Value')}
+                          className={cn(
+                            'h-8',
+                            getRowErrors(row).paramValue && 'border-red-500'
+                          )}
+                        />
+                      ) : (
+                        <span className='text-muted-foreground text-xs'>
+                          {matchMode === 'any'
+                            ? t('Applies to any non-empty value')
+                            : t('Multiplier × item count')}
+                        </span>
                       )}
-                    />
-                  </div>
+                    </div>
 
-                  {/* 操作列 */}
-                  <div className='flex items-center justify-end'>
-                    {/* 重复警告图标 */}
-                    {getRowErrors(row).duplicate && (
-                      <AlertTriangle className='text-amber-500 mr-2 size-4' />
-                    )}
-                    <Button
-                      type='button'
-                      variant='ghost'
-                      size='sm'
-                      className='size-8 p-0'
-                      onClick={() => handleDeleteRow(row.id)}
-                    >
-                      <Trash2 className='size-4' />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* 错误提示 */}
-                {(getRowErrors(row).paramName ||
-                  getRowErrors(row).paramValue ||
-                  getRowErrors(row).ratio ||
-                  getRowErrors(row).duplicate) && (
-                  <div className='px-4 pb-2 text-xs'>
-                    {getRowErrors(row).paramName && (
-                      <div className='text-red-500'>{getRowErrors(row).paramName}</div>
-                    )}
-                    {getRowErrors(row).paramValue && (
-                      <div className='text-red-500'>{getRowErrors(row).paramValue}</div>
-                    )}
-                    {getRowErrors(row).ratio && (
-                      <div className='text-red-500'>{getRowErrors(row).ratio}</div>
-                    )}
-                    {getRowErrors(row).duplicate && (
-                      <div className='text-amber-600'>
-                        {t(
-                          'This parameter value already exists and will override the previous configuration'
+                    {/* 倍率列 */}
+                    <div className='flex items-center'>
+                      <Input
+                        type='number'
+                        step='0.01'
+                        min='0.01'
+                        value={row.ratio}
+                        onChange={(e) =>
+                          handleFieldChange(
+                            row.id,
+                            'ratio',
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                        placeholder='1.0'
+                        className={cn(
+                          'h-8',
+                          getRowErrors(row).ratio && 'border-red-500'
                         )}
-                      </div>
-                    )}
+                      />
+                    </div>
+
+                    {/* 操作列 */}
+                    <div className='flex items-center justify-end'>
+                      {/* 重复警告图标 */}
+                      {getRowErrors(row).duplicate && (
+                        <AlertTriangle className='mr-2 size-4 text-amber-500' />
+                      )}
+                      <Button
+                        type='button'
+                        variant='ghost'
+                        size='sm'
+                        className='size-8 p-0'
+                        onClick={() => handleDeleteRow(row.id)}
+                      >
+                        <Trash2 className='size-4' />
+                      </Button>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {/* 错误提示 */}
+                  {(getRowErrors(row).paramName ||
+                    getRowErrors(row).paramValue ||
+                    getRowErrors(row).ratio ||
+                    getRowErrors(row).duplicate) && (
+                    <div className='px-4 pb-2 text-xs'>
+                      {getRowErrors(row).paramName && (
+                        <div className='text-red-500'>
+                          {getRowErrors(row).paramName}
+                        </div>
+                      )}
+                      {getRowErrors(row).paramValue && (
+                        <div className='text-red-500'>
+                          {getRowErrors(row).paramValue}
+                        </div>
+                      )}
+                      {getRowErrors(row).ratio && (
+                        <div className='text-red-500'>
+                          {getRowErrors(row).ratio}
+                        </div>
+                      )}
+                      {getRowErrors(row).duplicate && (
+                        <div className='text-amber-600'>
+                          {t(
+                            'This parameter value already exists and will override the previous configuration'
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

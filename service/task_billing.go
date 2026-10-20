@@ -10,6 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
@@ -20,8 +21,10 @@ import (
 func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 	tokenName := c.GetString("token_name")
 	logContent := fmt.Sprintf("操作 %s", info.Action)
-	// 支持任务按次或按秒计费
-	if common.StringsContains(constant.TaskPricePatches, info.OriginModelName) {
+	// 支持任务按次、按秒或按表达式计费
+	if billing_setting.GetBillingMode(info.OriginModelName) == billing_setting.BillingModeTieredExpr {
+		logContent = fmt.Sprintf("%s，表达式计费", logContent)
+	} else if common.StringsContains(constant.TaskPricePatches, info.OriginModelName) {
 		if s := info.PriceData.OtherRatios()["seconds"]; s > 0 {
 			logContent = fmt.Sprintf("%s，按%.0f秒计费", logContent, s)
 		} else {

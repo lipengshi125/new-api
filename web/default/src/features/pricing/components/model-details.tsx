@@ -1126,7 +1126,11 @@ function CustomRatiosSection(props: {
   const { t } = useTranslation()
 
   const flatRows = useMemo(() => {
-    const rows: Array<{ paramName: string; paramValue: string; ratio: number }> = []
+    const rows: Array<{
+      paramName: string
+      paramValue: string
+      ratio: number
+    }> = []
     Object.entries(props.customRatios).forEach(([paramName, valueMap]) => {
       Object.entries(valueMap).forEach(([paramValue, ratio]) => {
         rows.push({ paramName, paramValue, ratio })
@@ -1136,6 +1140,12 @@ function CustomRatiosSection(props: {
   }, [props.customRatios])
 
   if (flatRows.length === 0) return null
+
+  // 保留参数值（见 relay/helper/custom_ratio.go）显示为可读文案
+  const reservedValueLabels: Record<string, string> = {
+    '*': t('Any value'),
+    '*count': t('Per item'),
+  }
 
   return (
     <section>
@@ -1162,7 +1172,7 @@ function CustomRatiosSection(props: {
                   {row.paramName}
                 </td>
                 <td className='text-muted-foreground px-3 py-2.5'>
-                  {row.paramValue}
+                  {reservedValueLabels[row.paramValue] ?? row.paramValue}
                 </td>
                 <td className='text-foreground px-3 py-2.5 text-right font-mono font-semibold'>
                   ×{row.ratio}

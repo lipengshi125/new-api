@@ -298,6 +298,25 @@ export function evalExprLocally(
       abs: Math.abs,
       ceil: Math.ceil,
       floor: Math.floor,
+      // 后端 expr-lang 内置的类型转换/计数函数，本地预览按同等语义模拟
+      float: (v: unknown) => Number(v ?? 0),
+      int: (v: unknown) => Math.trunc(Number(v ?? 0)),
+      count: (arr: unknown, pred: unknown) =>
+        Array.isArray(arr)
+          ? arr.filter((x) =>
+              typeof pred === 'function' ? pred(x) : Boolean(pred)
+            ).length
+          : 0,
+      // 预览没有真实请求上下文：请求参数/请求头视为未传，时间函数取本地当前时间
+      param: () => null,
+      header: () => '',
+      has: (source: unknown, substr: string) =>
+        source != null && !!substr && String(source).includes(substr),
+      hour: () => new Date().getHours(),
+      minute: () => new Date().getMinutes(),
+      weekday: () => new Date().getDay(),
+      month: () => new Date().getMonth() + 1,
+      day: () => new Date().getDate(),
     }
     for (const field of ESTIMATOR_VARS) {
       env[field.var] = extraTokenValues[field.stateKey] || 0

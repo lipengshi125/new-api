@@ -27,6 +27,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { getUserAvatarFallback, getUserAvatarStyle } from '@/lib/avatar'
 import { formatTimestampToDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
+
 import { TASK_PLATFORM_MAPPINGS, TASK_STATUS } from '../../constants'
 import {
   taskPlatformMapper,
@@ -39,6 +40,7 @@ import {
   type AudioClip,
 } from '../dialogs/audio-preview-dialog'
 import { FailReasonDialog } from '../dialogs/fail-reason-dialog'
+import { MediaPreviewDialog } from '../dialogs/media-preview-dialog'
 import { ModelBadge } from '../model-badge'
 import { useUsageLogsContext } from '../usage-logs-provider'
 import {
@@ -121,6 +123,8 @@ function AudioPreviewCell({ log }: { log: TaskLog }) {
 }
 
 function MediaPreviewCell({ log }: { log: TaskLog }) {
+  const { t } = useTranslation()
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null)
   const media = useMemo(() => {
     if (log.status !== TASK_STATUS.SUCCESS || !log.data) return []
     try {
@@ -134,41 +138,49 @@ function MediaPreviewCell({ log }: { log: TaskLog }) {
 
   if (media.length === 0) return null
 
+  const previewItem = previewIndex != null ? media[previewIndex] : undefined
+
   return (
-    <div className='flex flex-wrap gap-1'>
-      {media.map((item, i) =>
-        item.isVideo ? (
-          <a
+    <>
+      <div className='flex flex-wrap gap-1'>
+        {media.map((item, i) => (
+          <button
             key={i}
-            href={item.url}
-            target='_blank'
-            rel='noopener noreferrer'
-            className='block'
+            type='button'
+            className='block cursor-zoom-in'
+            onClick={() => setPreviewIndex(i)}
+            title={t('Preview')}
+            aria-label={t('Preview')}
           >
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <video
-              src={item.url}
-              className='h-14 w-14 cursor-pointer rounded object-cover'
-              muted
-            />
-          </a>
-        ) : (
-          <a
-            key={i}
-            href={item.url}
-            target='_blank'
-            rel='noopener noreferrer'
-            className='block'
-          >
-            <img
-              src={item.url}
-              className='h-14 w-14 cursor-pointer rounded object-cover'
-              alt=''
-            />
-          </a>
-        )
+            {item.isVideo ? (
+              // eslint-disable-next-line jsx-a11y/media-has-caption
+              <video
+                src={item.url}
+                className='pointer-events-none h-14 w-14 rounded object-cover'
+                muted
+                preload='metadata'
+              />
+            ) : (
+              <img
+                src={item.url}
+                className='h-14 w-14 rounded object-cover'
+                alt=''
+              />
+            )}
+          </button>
+        ))}
+      </div>
+      {previewItem && (
+        <MediaPreviewDialog
+          url={previewItem.url}
+          isVideo={previewItem.isVideo}
+          open={previewIndex != null}
+          onOpenChange={(open) => {
+            if (!open) setPreviewIndex(null)
+          }}
+        />
       )}
-    </div>
+    </>
   )
 }
 
@@ -380,9 +392,15 @@ export function useTaskLogsColumns(isAdmin: boolean): ColumnDef<TaskLog>[] {
       cell: ({ row }) => {
         const seconds = row.original.billing_seconds
         if (seconds && seconds > 0) {
-          return <span className='font-mono text-xs tabular-nums'>{seconds}s</span>
+          return (
+            <span className='font-mono text-xs tabular-nums'>{seconds}s</span>
+          )
         }
-        return <span className='font-mono text-xs tabular-nums'>1{t('count-unit')}</span>
+        return (
+          <span className='font-mono text-xs tabular-nums'>
+            1{t('count-unit')}
+          </span>
+        )
       },
       size: 80,
     },

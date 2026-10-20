@@ -8,6 +8,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
 
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -175,7 +176,23 @@ func Redeem(key string, userId int) (quota int, err error) {
 		if result.RowsAffected == 0 {
 			return errors.New("该兑换码已被使用")
 		}
-		return tx.Model(&User{}).Where("id = ?", userId).Update("quota", gorm.Expr("quota + ?", redemption.Quota)).Error
+		if err := tx.Model(&User{}).Where("id = ?", userId).Update("quota", gorm.Expr("quota + ?", redemption.Quota)).Error; err != nil {
+			return err
+		}
+		// 记录到充值订单（计费历史），兑换码不涉及实际支付，Money 为 0
+		now := common.GetTimestamp()
+		topUp := &TopUp{
+			UserId:          userId,
+			Amount:          decimal.NewFromInt(int64(redemption.Quota)).Div(decimal.NewFromFloat(common.QuotaPerUnit)).IntPart(),
+			Money:           0,
+			TradeNo:         fmt.Sprintf("REDEEMUSR%dNO%d", userId, redemption.Id),
+			PaymentMethod:   PaymentMethodRedemption,
+			PaymentProvider: PaymentProviderRedemption,
+			CreateTime:      now,
+			CompleteTime:    now,
+			Status:          common.TopUpStatusSuccess,
+		}
+		return tx.Create(topUp).Error
 	})
 	if err != nil {
 		common.SysError("redemption failed: " + err.Error())

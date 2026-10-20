@@ -16,12 +16,31 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import type { TFunction } from 'i18next'
+
 import { EXCLUDED_GROUPS, FILTER_ALL, QUOTA_TYPE_VALUES } from '../constants'
 import type { PricingModel } from '../types'
 
 // ----------------------------------------------------------------------------
 // Model Helper Utilities
 // ----------------------------------------------------------------------------
+
+/**
+ * Human-readable label for a custom parameter multiplier entry.
+ * Reserved values (see relay/helper/custom_ratio.go): '*' = any non-empty
+ * value, '*count' = multiplier applied per item.
+ */
+export function formatCustomRatioCondition(
+  paramName: string,
+  paramValue: string,
+  t: TFunction
+): string {
+  if (paramValue === '*') return t('When {{name}} is set', { name: paramName })
+  if (paramValue === '*count') {
+    return t('Per item in {{name}}', { name: paramName })
+  }
+  return `${t('When')} ${paramName}=${paramValue}`
+}
 
 /**
  * Get available groups for a model

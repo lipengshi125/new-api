@@ -5243,6 +5243,19 @@
     "Edit API document": "Edit API document",
     "Failed to save API documentation": "Failed to save API documentation",
     "API documentation saved": "API documentation saved",
-    "Edit API documentation": "Edit API documentation"
+    "Edit API documentation": "Edit API documentation",
+    "Video Preview": "Video Preview",
+    "Failed to load video": "Failed to load video",
+    "Copy link": "Copy link",
+    "Exact value": "Exact value",
+    "Any value": "Any value",
+    "Per item": "Per item",
+    "Match": "Match",
+    "Applies to any non-empty value": "Applies to any non-empty value",
+    "Multiplier × item count": "Multiplier × item count",
+    "Parameter name can only contain letters, numbers, underscores, hyphens and dots": "Parameter name can only contain letters, numbers, underscores, hyphens and dots",
+    "Exact value: applies when the parameter equals the value. Any value: applies whenever the parameter is present and non-empty. Per item: multiplier × item count (array length; a non-empty single value counts as 1; capped at 128). Use dots for nested fields, e.g. input.images.": "Exact value: applies when the parameter equals the value. Any value: applies whenever the parameter is present and non-empty. Per item: multiplier × item count (array length; a non-empty single value counts as 1; capped at 128). Use dots for nested fields, e.g. input.images.",
+    "When {{name}} is set": "When {{name}} is set",
+    "Per item in {{name}}": "Per item in {{name}}"
   }
 }

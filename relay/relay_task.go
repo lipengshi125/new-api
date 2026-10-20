@@ -19,6 +19,7 @@ import (
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/sjson"
@@ -181,40 +182,52 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 
 	// 4. 价格计算：基础模型价格
 	info.OriginModelName = modelName
-	priceData, err := helper.ModelPriceHelperPerCall(c, info)
-	if err != nil {
-		return nil, service.TaskErrorWrapper(err, "model_price_error", http.StatusBadRequest)
-	}
-	info.PriceData = priceData
 
-	// 5. 计费估算：让适配器根据用户请求提供 OtherRatios（时长、分辨率等）
-	//    必须在 ModelPriceHelperPerCall 之后调用（它会重建 PriceData）。
-	//    ResolveOriginTask 可能已在 remix 路径中预设了 OtherRatios，此处合并。
-	if estimatedRatios := adaptor.EstimateBilling(c, info); len(estimatedRatios) > 0 {
-		for k, v := range estimatedRatios {
-			info.PriceData.AddOtherRatio(k, v)
+	// 4.1 表达式计费：费用由表达式根据请求参数一次算定（含时长、分辨率等），
+	//     因此跳过适配器估算倍率、自定义倍率、按秒倍率和提交后的倍率调整，避免重复计费。
+	isTieredExpr := billing_setting.GetBillingMode(modelName) == billing_setting.BillingModeTieredExpr
+	if isTieredExpr {
+		priceData, err := helper.ModelPriceHelperTieredTask(c, info)
+		if err != nil {
+			return nil, service.TaskErrorWrapperLocal(err, "model_price_error", http.StatusBadRequest)
 		}
-	}
+		info.PriceData = priceData
+	} else {
+		priceData, err := helper.ModelPriceHelperPerCall(c, info)
+		if err != nil {
+			return nil, service.TaskErrorWrapper(err, "model_price_error", http.StatusBadRequest)
+		}
+		info.PriceData = priceData
 
-	// 5.3 应用自定义倍率配置：从请求参数中检测自定义字段（如 resolution、quality 等）
-	//     并应用管理员配置的倍率映射
-	if customRatios := ratio_setting.GetCustomRatios(modelName); len(customRatios) > 0 {
-		helper.ApplyCustomRatios(c, info, customRatios)
-	}
+		// 5. 计费估算：让适配器根据用户请求提供 OtherRatios（时长、分辨率等）
+		//    必须在 ModelPriceHelperPerCall 之后调用（它会重建 PriceData）。
+		//    ResolveOriginTask 可能已在 remix 路径中预设了 OtherRatios，此处合并。
+		if estimatedRatios := adaptor.EstimateBilling(c, info); len(estimatedRatios) > 0 {
+			for k, v := range estimatedRatios {
+				info.PriceData.AddOtherRatio(k, v)
+			}
+		}
 
-	// 5.5 时长倍率仅在按秒计费时生效：按次计费的模型不应乘以 seconds/duration，
-	//     否则会按请求参数里的秒数放大扣费（例如 seconds:15 使按次价格被 x15）。
-	if ratio_setting.GetBillingUnit(modelName) != "second" {
-		info.PriceData.RemoveOtherRatio("seconds")
-		info.PriceData.RemoveOtherRatio("duration")
-	}
+		// 5.3 应用自定义倍率配置：从请求参数中检测自定义字段（如 resolution、quality 等）
+		//     并应用管理员配置的倍率映射
+		if customRatios := ratio_setting.GetCustomRatios(modelName); len(customRatios) > 0 {
+			helper.ApplyCustomRatios(c, info, customRatios)
+		}
 
-	// 6. 将 OtherRatios 应用到基础额度（饱和转换，防止溢出成负数）
-	if !common.StringsContains(constant.TaskPricePatches, modelName) {
-		quotaWithRatios := info.PriceData.ApplyOtherRatiosToFloat(float64(info.PriceData.Quota))
-		quota, clamp := common.QuotaFromFloatChecked(quotaWithRatios)
-		info.PriceData.Quota = quota
-		noteTaskQuotaClamp(info, clamp)
+		// 5.5 时长倍率仅在按秒计费时生效：按次计费的模型不应乘以 seconds/duration，
+		//     否则会按请求参数里的秒数放大扣费（例如 seconds:15 使按次价格被 x15）。
+		if ratio_setting.GetBillingUnit(modelName) != "second" {
+			info.PriceData.RemoveOtherRatio("seconds")
+			info.PriceData.RemoveOtherRatio("duration")
+		}
+
+		// 6. 将 OtherRatios 应用到基础额度（饱和转换，防止溢出成负数）
+		if !common.StringsContains(constant.TaskPricePatches, modelName) {
+			quotaWithRatios := info.PriceData.ApplyOtherRatiosToFloat(float64(info.PriceData.Quota))
+			quota, clamp := common.QuotaFromFloatChecked(quotaWithRatios)
+			info.PriceData.Quota = quota
+			noteTaskQuotaClamp(info, clamp)
+		}
 	}
 
 	// 7. 预扣费（仅首次 — 重试时 info.Billing 已存在，跳过）
@@ -257,6 +270,15 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 
 	// 11. 提交后计费调整：让适配器根据上游实际返回调整 OtherRatios
 	finalQuota := info.PriceData.Quota
+	// 表达式计费的额度已在提交前算定，不受适配器倍率调整影响
+	if isTieredExpr {
+		return &TaskSubmitResult{
+			UpstreamTaskID: upstreamTaskID,
+			TaskData:       taskData,
+			Platform:       platform,
+			Quota:          finalQuota,
+		}, nil
+	}
 	if adjustedRatios := adaptor.AdjustBillingOnSubmit(info, taskData); len(adjustedRatios) > 0 {
 		if adjustedQuota, ok := recalcQuotaFromRatios(info, adjustedRatios); ok {
 			// 基于调整后的 ratios 重新计算 quota

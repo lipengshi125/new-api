@@ -321,6 +321,24 @@ export function buildPreviewRows(
   ]
 }
 
+/**
+ * 自定义倍率参数值的保留匹配模式（与后端 relay/helper/custom_ratio.go 保持一致）
+ * - '*'      参数存在且非空时应用倍率（任意值）
+ * - '*count' 倍率 = 配置倍率 × 元素个数（数组取长度，非空标量计 1）
+ */
+export const CUSTOM_RATIO_MATCH_ANY = '*'
+export const CUSTOM_RATIO_MATCH_PER_ITEM = '*count'
+
+export type CustomRatioMatchMode = 'exact' | 'any' | 'per_item'
+
+export function getCustomRatioMatchMode(
+  paramValue: string
+): CustomRatioMatchMode {
+  if (paramValue === CUSTOM_RATIO_MATCH_ANY) return 'any'
+  if (paramValue === CUSTOM_RATIO_MATCH_PER_ITEM) return 'per_item'
+  return 'exact'
+}
+
 export type FlatRatioRow = {
   id: string
   paramName: string

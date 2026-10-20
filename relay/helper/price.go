@@ -2,6 +2,7 @@ package helper
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -249,6 +250,71 @@ func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (types
 		GroupRatioInfo: groupRatioInfo,
 	}
 	return priceData, nil
+}
+
+// ModelPriceHelperTieredTask 为异步任务按表达式计算一次性扣费额度。
+// 任务提交时没有 token 用量，表达式中的 token 变量均为 0，费用完全由
+// param()/header() 等请求条件决定。结果即最终扣费（按次结算，不做轮询差额），
+// 因此返回的 PriceData 不含 OtherRatios，且 UsePrice=true。
+func ModelPriceHelperTieredTask(c *gin.Context, info *relaycommon.RelayInfo) (types.PriceData, error) {
+	groupRatioInfo := HandleGroupRatio(c, info)
+
+	exprStr, ok := billing_setting.GetBillingExpr(info.OriginModelName)
+	if !ok || strings.TrimSpace(exprStr) == "" {
+		return types.PriceData{}, fmt.Errorf("model %s is configured as tiered_expr but has no billing expression", info.OriginModelName)
+	}
+
+	requestInput, err := ResolveIncomingBillingExprRequestInput(c, info)
+	if err != nil {
+		return types.PriceData{}, err
+	}
+	// multipart/form 提交没有 JSON body：把表单字段（取首个值）转成 JSON 对象，
+	// 使 param("resolution") 等写法在两种提交方式下一致。
+	if len(requestInput.Body) == 0 && c.Request.MultipartForm != nil {
+		fields := make(map[string]string, len(c.Request.MultipartForm.Value))
+		for key, values := range c.Request.MultipartForm.Value {
+			if len(values) > 0 {
+				fields[key] = values[0]
+			}
+		}
+		if requestInput.Body, err = common.Marshal(fields); err != nil {
+			return types.PriceData{}, err
+		}
+	}
+
+	rawCost, trace, err := billingexpr.RunExprWithRequest(exprStr, billingexpr.TokenParams{}, requestInput)
+	if err != nil {
+		return types.PriceData{}, fmt.Errorf("model %s tiered expr run failed: %w", info.OriginModelName, err)
+	}
+	if math.IsNaN(rawCost) || rawCost < 0 {
+		return types.PriceData{}, fmt.Errorf("model %s tiered expr produced invalid cost %v", info.OriginModelName, rawCost)
+	}
+
+	// 表达式系数是 $/1M 单价，与同步表达式计费、按次计费使用同一换算
+	modelPrice := rawCost / 1_000_000
+	quota, err := billingexpr.QuotaRoundStrict(modelPrice * common.QuotaPerUnit * groupRatioInfo.GroupRatio)
+	if err != nil {
+		return types.PriceData{}, err
+	}
+
+	freeModel := false
+	if !operation_setting.GetQuotaSetting().EnableFreeModelPreConsume {
+		if groupRatioInfo.GroupRatio == 0 || modelPrice == 0 {
+			quota = 0
+			freeModel = true
+		}
+	}
+
+	logger.LogDebug(c, "model_price_helper_tiered_task result: model=%s quota=%d price=%.6f groupRatio=%.2f tier=%s", info.OriginModelName, quota, modelPrice, groupRatioInfo.GroupRatio, trace.MatchedTier)
+
+	return types.PriceData{
+		FreeModel:         freeModel,
+		ModelPrice:        modelPrice,
+		UsePrice:          true,
+		Quota:             quota,
+		QuotaToPreConsume: quota,
+		GroupRatioInfo:    groupRatioInfo,
+	}, nil
 }
 
 func HasModelBillingConfig(modelName string) bool {

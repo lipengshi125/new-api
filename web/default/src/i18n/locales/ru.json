@@ -5243,6 +5243,19 @@
     "Edit API document": "Редактировать документ API",
     "Failed to save API documentation": "Не удалось сохранить документацию API",
     "API documentation saved": "Документация API сохранена",
-    "Edit API documentation": "Редактировать документацию API"
+    "Edit API documentation": "Редактировать документацию API",
+    "Video Preview": "Предпросмотр видео",
+    "Failed to load video": "Не удалось загрузить видео",
+    "Copy link": "Копировать ссылку",
+    "Exact value": "Точное значение",
+    "Any value": "Любое значение",
+    "Per item": "За элемент",
+    "Match": "Сопоставление",
+    "Applies to any non-empty value": "Применяется к любому непустому значению",
+    "Multiplier × item count": "Множитель × количество элементов",
+    "Parameter name can only contain letters, numbers, underscores, hyphens and dots": "Имя параметра может содержать только буквы, цифры, подчёркивания, дефисы и точки",
+    "Exact value: applies when the parameter equals the value. Any value: applies whenever the parameter is present and non-empty. Per item: multiplier × item count (array length; a non-empty single value counts as 1; capped at 128). Use dots for nested fields, e.g. input.images.": "Точное значение: применяется, когда параметр равен значению. Любое значение: применяется, если параметр присутствует и не пуст. За элемент: множитель × количество элементов (длина массива; непустое одиночное значение считается за 1; не более 128). Для вложенных полей используйте точки, например input.images.",
+    "When {{name}} is set": "Если задан {{name}}",
+    "Per item in {{name}}": "За каждый элемент {{name}}"
   }
 }

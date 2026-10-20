@@ -5243,6 +5243,19 @@
     "Edit API document": "編輯 API 文件",
     "Failed to save API documentation": "儲存 API 文件失敗",
     "API documentation saved": "API 文件已儲存",
-    "Edit API documentation": "編輯 API 文件"
+    "Edit API documentation": "編輯 API 文件",
+    "Video Preview": "影片預覽",
+    "Failed to load video": "影片載入失敗",
+    "Copy link": "複製連結",
+    "Exact value": "精確值",
+    "Any value": "任意值",
+    "Per item": "按個數",
+    "Match": "匹配方式",
+    "Applies to any non-empty value": "參數存在且非空即生效",
+    "Multiplier × item count": "倍率 × 元素個數",
+    "Parameter name can only contain letters, numbers, underscores, hyphens and dots": "參數名只能包含字母、數字、底線、連字號和點號",
+    "Exact value: applies when the parameter equals the value. Any value: applies whenever the parameter is present and non-empty. Per item: multiplier × item count (array length; a non-empty single value counts as 1; capped at 128). Use dots for nested fields, e.g. input.images.": "精確值：參數等於該值時生效；任意值：參數存在且非空即生效；按個數：倍率 × 元素個數（陣列取長度，非空單值計為 1，上限 128）。巢狀欄位可用點號表示，如 input.images。",
+    "When {{name}} is set": "當 {{name}} 存在時",
+    "Per item in {{name}}": "{{name}} 每項"
   }
 }
