@@ -62,6 +62,8 @@ export type PricingModel = {
   custom_ratios?: Record<string, Record<string, number>>
   /** Admin notes for custom ratios: parameter name -> (parameter value -> note) */
   custom_ratio_notes?: Record<string, Record<string, string>>
+  /** Admin-written billing explanation, shown for expression pricing */
+  billing_note?: string
   /**
    * Per-model call-sample overrides: endpoint type -> language -> code.
    * Missing entries fall back to the site-wide templates, then to the

@@ -41,6 +41,7 @@ const getModelDefaults = (settings: BillingSettings) => ({
   ModelPriceUnit: settings.ModelPriceUnit,
   CustomRatios: settings.CustomRatios,
   CustomRatioNotes: settings.CustomRatioNotes,
+  ModelBillingNotes: settings.ModelBillingNotes,
 })
 
 const getGroupDefaults = (settings: BillingSettings) => ({

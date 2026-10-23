@@ -5265,6 +5265,25 @@
     "Add value": "Ajouter une valeur",
     "Delete parameter": "Supprimer le paramètre",
     "Note (shown in model marketplace)": "Note (affichée sur la place de marché des modèles)",
-    "This parameter name is already used by another group": "Ce nom de paramètre est déjà utilisé par un autre groupe"
+    "This parameter name is already used by another group": "Ce nom de paramètre est déjà utilisé par un autre groupe",
+    "Reference video duration ({{path}})": "Durée de la vidéo de référence ({{path}})",
+    "Output duration ({{path}})": "Durée de sortie ({{path}})",
+    "reference video seconds": "secondes de vidéo de référence",
+    "output seconds": "secondes de sortie",
+    "{{name}} multiplier": "multiplicateur {{name}}",
+    "{{video}}s reference video, {{output}}s output": "{{video}} s de vidéo de référence, {{output}} s de sortie",
+    "{{output}}s output": "{{output}} s de sortie",
+    "Values not listed are billed at ×1.": "Les valeurs non listées sont facturées ×1.",
+    "Billing formula": "Formule de facturation",
+    "before group ratio": "hors ratio de groupe",
+    "Billing Note": "Note de facturation",
+    "This model uses dynamic pricing. Please contact the administrator for details.": "Ce modèle utilise une tarification dynamique. Contactez l’administrateur pour plus de détails.",
+    "Model marketplace display": "Affichage sur la place de marché",
+    "The model marketplace shows this pricing in a readable form. Notes below are display-only and do not affect billing.": "La place de marché affiche cette tarification de façon lisible. Les notes ci-dessous sont uniquement informatives et n’affectent pas la facturation.",
+    "This expression cannot be shown in a readable form. The model marketplace hides the expression and shows only the billing note below.": "Cette expression ne peut pas être affichée de façon lisible. La place de marché masque l’expression et affiche uniquement la note de facturation ci-dessous.",
+    "Explain how this model is billed, e.g. ¥0.18 per second of output plus reference video length.": "Expliquez comment ce modèle est facturé, ex. ¥0,18 par seconde de sortie plus la durée de la vidéo de référence.",
+    "incl. reference video": "vidéo de référence incluse",
+    "Prices are adjusted by request conditions": "Les prix sont ajustés selon les conditions de la requête",
+    "Per call": "Par appel"
   }
 }

@@ -5265,6 +5265,25 @@
     "Add value": "添加参数值",
     "Delete parameter": "删除参数",
     "Note (shown in model marketplace)": "备注（会显示在模型广场）",
-    "This parameter name is already used by another group": "该参数名已被其他参数组使用"
+    "This parameter name is already used by another group": "该参数名已被其他参数组使用",
+    "Reference video duration ({{path}})": "参考视频时长（{{path}}）",
+    "Output duration ({{path}})": "输出时长（{{path}}）",
+    "reference video seconds": "参考视频秒数",
+    "output seconds": "输出秒数",
+    "{{name}} multiplier": "{{name}} 倍率",
+    "{{video}}s reference video, {{output}}s output": "参考视频 {{video}} 秒，输出 {{output}} 秒",
+    "{{output}}s output": "输出 {{output}} 秒",
+    "Values not listed are billed at ×1.": "未列出的参数值按 ×1 计费。",
+    "Billing formula": "计费公式",
+    "before group ratio": "未含分组倍率",
+    "Billing Note": "计费说明",
+    "This model uses dynamic pricing. Please contact the administrator for details.": "该模型采用动态计费，详情请联系管理员。",
+    "Model marketplace display": "模型广场展示",
+    "The model marketplace shows this pricing in a readable form. Notes below are display-only and do not affect billing.": "模型广场会以易读的方式展示该定价。下方备注仅用于展示，不影响计费。",
+    "This expression cannot be shown in a readable form. The model marketplace hides the expression and shows only the billing note below.": "该表达式无法以易读方式展示。模型广场会隐藏表达式，只展示下方的计费说明。",
+    "Explain how this model is billed, e.g. ¥0.18 per second of output plus reference video length.": "说明该模型如何计费，例如：每秒 ¥0.18，按输出时长加参考视频时长计费。",
+    "incl. reference video": "含参考视频",
+    "Prices are adjusted by request conditions": "价格根据请求条件调整",
+    "Per call": "按次"
   }
 }

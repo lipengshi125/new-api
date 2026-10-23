@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -34,7 +35,8 @@ const (
 var errRangeUnsupported = errors.New("range request not supported")
 
 // ProbeVideoURLsSeconds 读取视频 URL（或 data: URL）的时长并求和，单位秒。
-// 仅支持 MP4/MOV（ISO BMFF）。时长来自用户提供的文件，属于计费乘数：
+// 仅支持 MP4/MOV（ISO BMFF）。按秒计费只计整秒：每个视频的时长先四舍五入到整数
+// （如 10.4→10、2.5→3）再求和。时长来自用户提供的文件，属于计费乘数：
 // 单个与总时长都钳制在 MaxProbedVideoSeconds 以内；任何一个视频读取失败都返回错误，
 // 由调用方拒绝请求，而不是按 0 秒计费。
 func ProbeVideoURLsSeconds(ctx context.Context, urls []string) (float64, error) {
@@ -51,7 +53,7 @@ func ProbeVideoURLsSeconds(ctx context.Context, urls []string) (float64, error) 
 		if err != nil {
 			return 0, fmt.Errorf("failed to read duration of video #%d: %w", i+1, err)
 		}
-		total += min(seconds, MaxProbedVideoSeconds)
+		total += min(math.Round(seconds), MaxProbedVideoSeconds)
 	}
 	return min(total, MaxProbedVideoSeconds), nil
 }

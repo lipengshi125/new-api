@@ -20,7 +20,14 @@ For commercial licensing, please contact support@quantumnous.com
 import React from 'react';
 import { Avatar, Typography, Table, Tag } from '@douyinfe/semi-ui';
 import { IconCoinMoneyStroked } from '@douyinfe/semi-icons';
-import { calculateModelPrice, getModelPriceItems } from '../../../../../helpers';
+import {
+  calculateModelPrice,
+  getModelPriceItems,
+  parseTiersFromExpr,
+  getCurrencyConfig,
+} from '../../../../../helpers';
+import { BILLING_PRICING_VARS } from '../../../../../constants';
+import { splitBillingExprAndRequestRules } from '../../../../../pages/Setting/Ratio/components/requestRuleExpr';
 
 const { Text } = Typography;
 
@@ -73,8 +80,11 @@ const ModelPricingTable = ({
         key: group,
         group: group,
         ratio: groupRatioValue,
-        billingType:
-          modelData?.billing_mode === 'tiered_expr'
+        billingType: priceData.isTaskExpr
+          ? priceData.billingUnit === 'second'
+            ? t('按秒计费')
+            : t('按次计费')
+          : modelData?.billing_mode === 'tiered_expr'
             ? t('动态计费')
             : modelData?.quota_type === 0
               ? t('按量计费')
@@ -133,8 +143,35 @@ const ModelPricingTable = ({
     columns.push({
       title: siteDisplayType === 'TOKENS' ? t('计费摘要') : t('价格摘要'),
       dataIndex: 'priceItems',
-      render: (items) => {
+      render: (items, record) => {
         if (items.length === 1 && items[0].isDynamic) {
+          // 单档 token 表达式：直接列出该分组的各项价格，不再让用户去上方对照
+          const tiers = parseTiersFromExpr(
+            splitBillingExprAndRequestRules(modelData?.billing_expr || '')
+              .billingExpr,
+          );
+          if (tiers.length === 1) {
+            const { symbol, rate } = getCurrencyConfig();
+            const tier = tiers[0];
+            return (
+              <div className='space-y-1'>
+                {BILLING_PRICING_VARS.filter((v) => tier[v.field] > 0).map(
+                  (v) => (
+                    <div key={v.field} className='font-semibold text-orange-600'>
+                      {t(v.shortLabel)}{' '}
+                      {`${symbol}${Number(
+                        (tier[v.field] * record.ratio * rate).toFixed(4),
+                      )}`}
+                      <span className='text-xs text-gray-500 font-normal'>
+                        {' '}
+                        / 1M tokens
+                      </span>
+                    </div>
+                  ),
+                )}
+              </div>
+            );
+          }
           return (
             <Text type='tertiary' size='small'>
               {t('见上方动态计费详情')}

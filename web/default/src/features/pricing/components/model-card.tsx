@@ -31,10 +31,16 @@ import {
 } from '../lib/dynamic-price'
 import { parseTags } from '../lib/filters'
 import { isTokenBasedModel } from '../lib/model-helpers'
-import { formatPrice, formatRequestPrice } from '../lib/price'
+import {
+  formatPrice,
+  formatRequestPrice,
+  formatTaskUnitPrice,
+} from '../lib/price'
+import { parseTaskExprPricing } from '../lib/task-expr'
 import type { PricingModel, TokenUnit } from '../types'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelPerfBadge, type ModelPerfBadgeData } from './model-perf-badge'
+import { TaskUnitLabel } from './task-expr-pricing'
 
 export interface ModelCardProps {
   model: PricingModel
@@ -91,17 +97,37 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
     copyToClipboard(props.model.model_name || '')
   }
 
+  const taskPricing = dynamicSummary
+    ? parseTaskExprPricing(props.model.billing_expr)
+    : null
+
   let priceSummary: ReactNode
-  if (dynamicSummary) {
+  if (taskPricing) {
+    priceSummary = (
+      <span className='text-muted-foreground whitespace-nowrap'>
+        <span className='text-foreground font-mono font-semibold'>
+          {formatTaskUnitPrice(
+            taskPricing.unitPrice,
+            getDynamicDisplayGroupRatio(props.model, props.selectedGroup),
+            showRechargePrice,
+            priceRate,
+            usdExchangeRate
+          )}
+        </span>{' '}
+        / <TaskUnitLabel pricing={taskPricing} />
+      </span>
+    )
+  } else if (dynamicSummary) {
+    // 识别不了的表达式：只显示计费说明，不暴露原始表达式
     if (dynamicSummary.isSpecialExpression) {
       priceSummary = (
         <span className='min-w-0'>
-          <span className='text-amber-700 dark:text-amber-300'>
-            {t('Special billing expression')}
-          </span>
-          <code className='text-muted-foreground/70 mt-0.5 line-clamp-1 block font-mono text-[11px] break-all'>
-            {dynamicSummary.rawExpression}
-          </code>
+          <span className='text-muted-foreground'>{t('Dynamic Pricing')}</span>
+          {props.model.billing_note && (
+            <span className='text-muted-foreground/70 mt-0.5 line-clamp-1 block text-[11px] break-all'>
+              {props.model.billing_note}
+            </span>
+          )}
         </span>
       )
     } else if (dynamicSummary.primaryEntries.length > 0) {

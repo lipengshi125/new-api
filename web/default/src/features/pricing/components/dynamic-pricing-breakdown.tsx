@@ -64,6 +64,12 @@ type DynamicPricingBreakdownProps = {
    * icon header and uses the dialog's small text sizes. Defaults to false.
    */
   compact?: boolean
+  /**
+   * Model marketplace: when the expression has a single tier, its price table
+   * only repeats the base price shown above, so skip it (and the whole section
+   * when there are no request-conditional multipliers). Defaults to false.
+   */
+  hideSingleTierTable?: boolean
 }
 
 const VAR_LABELS: Record<string, string> = {
@@ -158,6 +164,7 @@ export function DynamicPricingBreakdown({
   matchedTierLabel,
   hideCacheColumns = false,
   compact = false,
+  hideSingleTierTable = false,
 }: DynamicPricingBreakdownProps) {
   const { t } = useTranslation()
   const expr = billingExpr || ''
@@ -194,33 +201,13 @@ export function DynamicPricingBreakdown({
 
   if (!expr) return null
 
-  if (!hasTiers) {
-    return (
-      <section className={cn('min-w-0', !compact && 'py-4')}>
-        {!compact && (
-          <div className='mb-3 flex items-center gap-2'>
-            <span className='inline-flex size-6 items-center justify-center rounded-lg bg-amber-100 text-amber-700 shadow-sm dark:bg-amber-500/20 dark:text-amber-300'>
-              <TagIcon className='size-3.5' />
-            </span>
-            <div>
-              <div className='text-foreground text-base font-medium'>
-                {t('Special billing expression')}
-              </div>
-              <div className='text-muted-foreground text-xs'>
-                {t('Unable to parse structured pricing')}
-              </div>
-            </div>
-          </div>
-        )}
-        <div className='text-muted-foreground mb-1 text-[10px] font-medium tracking-wider uppercase'>
-          {t('Raw expression')}
-        </div>
-        <code className='text-muted-foreground block text-xs break-all'>
-          {expr}
-        </code>
-      </section>
-    )
-  }
+  // 非 token 分档表达式（任务表达式或识别不了的表达式）不在此展示，
+  // 也不对用户暴露原始表达式
+  if (!hasTiers) return null
+
+  // 单档位：分档表与「基础价格」完全重复，只在有请求条件时展示条件倍率
+  const showTierTable = !(hideSingleTierTable && tiers.length === 1)
+  if (!showTierTable && !hasRules) return null
 
   const visiblePriceFields = BILLING_PRICING_VARS.filter((v) => {
     if (!hasTiers) return false
@@ -242,13 +229,15 @@ export function DynamicPricingBreakdown({
               {t('Dynamic Pricing')}
             </div>
             <div className='text-muted-foreground text-xs'>
-              {t('Prices vary by usage tier and request conditions')}
+              {showTierTable
+                ? t('Prices vary by usage tier and request conditions')
+                : t('Prices are adjusted by request conditions')}
             </div>
           </div>
         </div>
       )}
 
-      {hasTiers && (
+      {showTierTable && (
         <div className={cn(compact ? cn(hasRules && 'mb-2') : 'mb-3 sm:mb-4')}>
           <div
             className={

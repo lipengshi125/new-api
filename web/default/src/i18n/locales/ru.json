@@ -5265,6 +5265,25 @@
     "Add value": "Добавить значение",
     "Delete parameter": "Удалить параметр",
     "Note (shown in model marketplace)": "Примечание (отображается в каталоге моделей)",
-    "This parameter name is already used by another group": "Это имя параметра уже используется другой группой"
+    "This parameter name is already used by another group": "Это имя параметра уже используется другой группой",
+    "Reference video duration ({{path}})": "Длительность референсного видео ({{path}})",
+    "Output duration ({{path}})": "Длительность вывода ({{path}})",
+    "reference video seconds": "секунды референсного видео",
+    "output seconds": "секунды вывода",
+    "{{name}} multiplier": "множитель {{name}}",
+    "{{video}}s reference video, {{output}}s output": "{{video}} с референсного видео, {{output}} с вывода",
+    "{{output}}s output": "{{output}} с вывода",
+    "Values not listed are billed at ×1.": "Не указанные значения тарифицируются как ×1.",
+    "Billing formula": "Формула расчёта",
+    "before group ratio": "без множителя группы",
+    "Billing Note": "Пояснение к тарификации",
+    "This model uses dynamic pricing. Please contact the administrator for details.": "Эта модель использует динамическую тарификацию. За подробностями обратитесь к администратору.",
+    "Model marketplace display": "Отображение в каталоге моделей",
+    "The model marketplace shows this pricing in a readable form. Notes below are display-only and do not affect billing.": "Каталог моделей показывает эту тарификацию в понятном виде. Примечания ниже носят справочный характер и не влияют на тарификацию.",
+    "This expression cannot be shown in a readable form. The model marketplace hides the expression and shows only the billing note below.": "Это выражение нельзя показать в понятном виде. Каталог моделей скрывает выражение и показывает только пояснение ниже.",
+    "Explain how this model is billed, e.g. ¥0.18 per second of output plus reference video length.": "Опишите, как тарифицируется модель, например: ¥0,18 за секунду вывода плюс длительность референсного видео.",
+    "incl. reference video": "с референсным видео",
+    "Prices are adjusted by request conditions": "Цены корректируются в зависимости от условий запроса",
+    "Per call": "За вызов"
   }
 }

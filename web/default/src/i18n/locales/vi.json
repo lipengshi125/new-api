@@ -5265,6 +5265,25 @@
     "Add value": "Thêm giá trị",
     "Delete parameter": "Xóa tham số",
     "Note (shown in model marketplace)": "Ghi chú (hiển thị trên chợ mô hình)",
-    "This parameter name is already used by another group": "Tên tham số này đã được nhóm khác sử dụng"
+    "This parameter name is already used by another group": "Tên tham số này đã được nhóm khác sử dụng",
+    "Reference video duration ({{path}})": "Thời lượng video tham chiếu ({{path}})",
+    "Output duration ({{path}})": "Thời lượng đầu ra ({{path}})",
+    "reference video seconds": "số giây video tham chiếu",
+    "output seconds": "số giây đầu ra",
+    "{{name}} multiplier": "hệ số {{name}}",
+    "{{video}}s reference video, {{output}}s output": "{{video}} giây video tham chiếu, {{output}} giây đầu ra",
+    "{{output}}s output": "{{output}} giây đầu ra",
+    "Values not listed are billed at ×1.": "Các giá trị không được liệt kê tính ×1.",
+    "Billing formula": "Công thức tính phí",
+    "before group ratio": "chưa gồm hệ số nhóm",
+    "Billing Note": "Ghi chú tính phí",
+    "This model uses dynamic pricing. Please contact the administrator for details.": "Mô hình này dùng tính phí động. Vui lòng liên hệ quản trị viên để biết chi tiết.",
+    "Model marketplace display": "Hiển thị trên chợ mô hình",
+    "The model marketplace shows this pricing in a readable form. Notes below are display-only and do not affect billing.": "Chợ mô hình hiển thị giá này ở dạng dễ đọc. Các ghi chú bên dưới chỉ để hiển thị, không ảnh hưởng đến tính phí.",
+    "This expression cannot be shown in a readable form. The model marketplace hides the expression and shows only the billing note below.": "Biểu thức này không thể hiển thị ở dạng dễ đọc. Chợ mô hình sẽ ẩn biểu thức và chỉ hiển thị ghi chú tính phí bên dưới.",
+    "Explain how this model is billed, e.g. ¥0.18 per second of output plus reference video length.": "Giải thích cách tính phí của mô hình, ví dụ: ¥0,18 mỗi giây đầu ra cộng thời lượng video tham chiếu.",
+    "incl. reference video": "gồm video tham chiếu",
+    "Prices are adjusted by request conditions": "Giá được điều chỉnh theo điều kiện yêu cầu",
+    "Per call": "Theo lượt"
   }
 }

@@ -81,6 +81,11 @@ func newRuntimeEnv(params TokenParams, request RequestInput, trace *TraceResult)
 			trace.Cost = value
 			return value
 		},
+		// fixed(amount)：每次固定价格（美元），换算成与 v1「$/1M」一致的系数，
+		// 因此 fixed(0.16) 与 160000 等价
+		"fixed": func(amount float64) float64 {
+			return amount * 1_000_000
+		},
 		"header": func(key string) string {
 			return headers[strings.ToLower(strings.TrimSpace(key))]
 		},

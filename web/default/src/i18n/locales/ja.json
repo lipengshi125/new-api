@@ -5265,6 +5265,25 @@
     "Add value": "値を追加",
     "Delete parameter": "パラメータを削除",
     "Note (shown in model marketplace)": "備考（モデルマーケットに表示されます）",
-    "This parameter name is already used by another group": "このパラメータ名は他のグループで使用されています"
+    "This parameter name is already used by another group": "このパラメータ名は他のグループで使用されています",
+    "Reference video duration ({{path}})": "参照動画の長さ（{{path}}）",
+    "Output duration ({{path}})": "出力時間（{{path}}）",
+    "reference video seconds": "参照動画の秒数",
+    "output seconds": "出力秒数",
+    "{{name}} multiplier": "{{name}} 倍率",
+    "{{video}}s reference video, {{output}}s output": "参照動画 {{video}} 秒、出力 {{output}} 秒",
+    "{{output}}s output": "出力 {{output}} 秒",
+    "Values not listed are billed at ×1.": "記載のない値は ×1 で課金されます。",
+    "Billing formula": "課金式",
+    "before group ratio": "グループ倍率を除く",
+    "Billing Note": "課金説明",
+    "This model uses dynamic pricing. Please contact the administrator for details.": "このモデルは動的課金です。詳細は管理者にお問い合わせください。",
+    "Model marketplace display": "モデルマーケットでの表示",
+    "The model marketplace shows this pricing in a readable form. Notes below are display-only and do not affect billing.": "モデルマーケットではこの料金を分かりやすく表示します。下記の備考は表示専用で、課金には影響しません。",
+    "This expression cannot be shown in a readable form. The model marketplace hides the expression and shows only the billing note below.": "この式は分かりやすく表示できません。モデルマーケットでは式を非表示にし、下記の課金説明のみを表示します。",
+    "Explain how this model is billed, e.g. ¥0.18 per second of output plus reference video length.": "このモデルの課金方法を説明してください。例：出力 1 秒あたり ¥0.18、参照動画の長さも含めて課金。",
+    "incl. reference video": "参照動画を含む",
+    "Prices are adjusted by request conditions": "価格はリクエスト条件に応じて調整されます",
+    "Per call": "回数課金"
   }
 }

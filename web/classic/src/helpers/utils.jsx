@@ -27,6 +27,7 @@ import {
 } from '../constants/playground.constants';
 import { TABLE_COMPACT_MODES_KEY } from '../constants';
 import { MOBILE_BREAKPOINT } from '../hooks/common/useIsMobile';
+import { parseTaskExprPricing } from './taskExpr';
 
 const HTMLToastContent = ({ htmlContent }) => {
   return <div dangerouslySetInnerHTML={{ __html: htmlContent }} />;
@@ -647,9 +648,24 @@ export const calculateModelPrice = ({
 
   // 2. 动态计费（tiered_expr）
   if (record.billing_mode === 'tiered_expr' && record.billing_expr) {
+    // 任务模型（按次/按秒）的表达式：直接给出 ¥x / 秒（或次）
+    const taskPricing = parseTaskExprPricing(record.billing_expr);
+    if (taskPricing) {
+      return {
+        isTaskExpr: true,
+        taskPricing,
+        price: displayPrice(taskPricing.unitPrice * usedGroupRatio),
+        billingUnit: taskPricing.unit === 'second' ? 'second' : '',
+        isPerToken: false,
+        isTokensDisplay: false,
+        usedGroup,
+        usedGroupRatio,
+      };
+    }
     return {
       isDynamicPricing: true,
       billingExpr: record.billing_expr,
+      billingNote: record.billing_note || '',
       usedGroup,
       usedGroupRatio,
     };
@@ -789,6 +805,23 @@ export const getModelPriceItems = (
     ];
   }
 
+  // 任务表达式：基础价格 / 秒（或次），倍率由参数倍率表展示
+  if (priceData.isTaskExpr) {
+    const hasVideo = priceData.taskPricing.secondsSources.some(
+      (s) => s.kind === 'video',
+    );
+    return [
+      {
+        key: 'task',
+        label: t('基础价格'),
+        value: priceData.price,
+        suffix: ` / ${priceData.billingUnit === 'second' ? t('秒') : t('次')}${
+          hasVideo ? ` · ${t('含参考视频')}` : ''
+        }`,
+      },
+    ];
+  }
+
   if (priceData.isPerToken) {
     if (quotaDisplayType === 'TOKENS' || priceData.isTokensDisplay) {
       return [
@@ -898,7 +931,12 @@ export const getModelPriceItems = (
 };
 
 // 格式化动态计费摘要（用于卡片视图，与 formatPriceInfo 风格统一）
-export const formatDynamicPriceSummary = (billingExpr, t, groupRatio = 1) => {
+export const formatDynamicPriceSummary = (
+  billingExpr,
+  t,
+  groupRatio = 1,
+  billingNote = '',
+) => {
   if (!billingExpr) return <span style={{ color: 'var(--semi-color-text-1)' }}>{t('动态计费')}</span>;
 
   const quotaDisplayType = localStorage.getItem('quota_display_type') || 'USD';
@@ -929,6 +967,23 @@ export const formatDynamicPriceSummary = (billingExpr, t, groupRatio = 1) => {
   const hasCoeffs = 'p' in varCoeffs || 'c' in varCoeffs;
 
   const varLabels = BILLING_PRICING_VARS.map((v) => [v.key, v.label]);
+
+  // 识别不了的表达式（既不是 token 分档也不是任务表达式）：只显示计费说明
+  if (!hasCoeffs) {
+    return (
+      <>
+        <span style={{ color: 'var(--semi-color-text-1)' }}>{t('动态计费')}</span>
+        {billingNote && (
+          <span
+            className='line-clamp-2'
+            style={{ color: 'var(--semi-color-text-2)', wordBreak: 'break-word' }}
+          >
+            {billingNote}
+          </span>
+        )}
+      </>
+    );
+  }
 
   const hasTimeCondition = /\b(?:hour|minute|weekday|month|day)\(/.test(exprBody);
   const hasRequestCondition = /\b(?:param|header)\(/.test(exprBody);

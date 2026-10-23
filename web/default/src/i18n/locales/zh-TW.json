@@ -5265,6 +5265,25 @@
     "Add value": "新增參數值",
     "Delete parameter": "刪除參數",
     "Note (shown in model marketplace)": "備註（會顯示在模型廣場）",
-    "This parameter name is already used by another group": "該參數名已被其他參數組使用"
+    "This parameter name is already used by another group": "該參數名已被其他參數組使用",
+    "Reference video duration ({{path}})": "參考影片時長（{{path}}）",
+    "Output duration ({{path}})": "輸出時長（{{path}}）",
+    "reference video seconds": "參考影片秒數",
+    "output seconds": "輸出秒數",
+    "{{name}} multiplier": "{{name}} 倍率",
+    "{{video}}s reference video, {{output}}s output": "參考影片 {{video}} 秒，輸出 {{output}} 秒",
+    "{{output}}s output": "輸出 {{output}} 秒",
+    "Values not listed are billed at ×1.": "未列出的參數值按 ×1 計費。",
+    "Billing formula": "計費公式",
+    "before group ratio": "未含分組倍率",
+    "Billing Note": "計費說明",
+    "This model uses dynamic pricing. Please contact the administrator for details.": "該模型採用動態計費，詳情請聯繫管理員。",
+    "Model marketplace display": "模型廣場展示",
+    "The model marketplace shows this pricing in a readable form. Notes below are display-only and do not affect billing.": "模型廣場會以易讀的方式展示該定價。下方備註僅用於展示，不影響計費。",
+    "This expression cannot be shown in a readable form. The model marketplace hides the expression and shows only the billing note below.": "該表達式無法以易讀方式展示。模型廣場會隱藏表達式，只展示下方的計費說明。",
+    "Explain how this model is billed, e.g. ¥0.18 per second of output plus reference video length.": "說明該模型如何計費，例如：每秒 ¥0.18，按輸出時長加參考影片時長計費。",
+    "incl. reference video": "含參考影片",
+    "Prices are adjusted by request conditions": "價格根據請求條件調整",
+    "Per call": "按次"
   }
 }

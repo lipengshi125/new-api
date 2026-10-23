@@ -34,6 +34,7 @@ export type ModelPricingSnapshotInput = {
   billingExpr: string
   customRatios: string
   customRatioNotes?: string
+  billingNotes?: string
 }
 
 export type ModelPricingSnapshot = {
@@ -51,6 +52,7 @@ export type ModelPricingSnapshot = {
   requestRuleExpr?: string
   customRatios?: Record<string, Record<string, number>>
   customRatioNotes?: Record<string, Record<string, string>>
+  billingNote?: string
   hasConflict: boolean
 }
 
@@ -180,6 +182,7 @@ export const buildModelSnapshots = ({
   billingExpr,
   customRatios,
   customRatioNotes,
+  billingNotes,
 }: ModelPricingSnapshotInput): ModelPricingSnapshot[] => {
   const priceMap = safeJsonParse<Record<string, number>>(modelPrice, {
     fallback: {},
@@ -233,6 +236,10 @@ export const buildModelSnapshots = ({
     fallback: {},
     context: 'custom ratio notes',
   })
+  const billingNotesMap = safeJsonParse<Record<string, string>>(
+    billingNotes || '{}',
+    { fallback: {}, context: 'billing notes' }
+  )
 
   const modelNames = new Set([
     ...Object.keys(priceMap),
@@ -259,6 +266,7 @@ export const buildModelSnapshots = ({
     const audioCompletion = audioCompletionMap[name]?.toString() || ''
     const modelCustomRatios = customRatiosMap[name]
     const modelCustomRatioNotes = customRatioNotesMap[name]
+    const modelBillingNote = billingNotesMap[name]
 
     const modeForModel = billingModeMap[name]
     if (modeForModel === 'tiered_expr') {
@@ -280,6 +288,7 @@ export const buildModelSnapshots = ({
         audioCompletionRatio: audioCompletion,
         customRatios: modelCustomRatios,
         customRatioNotes: modelCustomRatioNotes,
+        billingNote: modelBillingNote,
         hasConflict: false,
       }
     }
@@ -296,6 +305,7 @@ export const buildModelSnapshots = ({
       audioCompletionRatio: audioCompletion,
       customRatios: modelCustomRatios,
       customRatioNotes: modelCustomRatioNotes,
+      billingNote: modelBillingNote,
       billingMode: price !== '' ? 'per-request' : 'per-token',
       hasConflict:
         price !== '' &&
@@ -326,5 +336,6 @@ export const getSnapshotSignature = (snapshot?: ModelPricingSnapshot) => {
     requestRuleExpr: snapshot.requestRuleExpr || '',
     customRatios: snapshot.customRatios || {},
     customRatioNotes: snapshot.customRatioNotes || {},
+    billingNote: snapshot.billingNote || '',
   })
 }

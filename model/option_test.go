@@ -17,7 +17,7 @@ func TestInitOptionMapSeedsCustomRatios(t *testing.T) {
 
 	InitOptionMap()
 
-	for _, key := range []string{"CustomRatios", "CustomRatioNotes"} {
+	for _, key := range []string{"CustomRatios", "CustomRatioNotes", "ModelBillingNotes"} {
 		common.OptionMapRWMutex.RLock()
 		value, ok := common.OptionMap[key]
 		common.OptionMapRWMutex.RUnlock()

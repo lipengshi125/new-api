@@ -26,6 +26,7 @@ import {
   calculateModelPrice,
   getModelPriceItems,
   getLobeHubIcon,
+  parseTaskExprPricing,
 } from '../../../../../helpers';
 import {
   renderLimitedItems,
@@ -34,6 +35,15 @@ import {
 import { useIsMobile } from '../../../../../hooks/common/useIsMobile';
 
 function renderQuotaType(type, record, t) {
+  // 任务表达式按实际单位显示按秒/按次
+  const taskPricing =
+    record?.billing_mode === 'tiered_expr'
+      ? parseTaskExprPricing(record.billing_expr)
+      : null;
+  if (taskPricing) {
+    const label = taskPricing.unit === 'second' ? t('按秒计费') : t('按次计费');
+    return <Tag color='teal' shape='circle'>{label}</Tag>;
+  }
   if (type === 1) {
     const label = record?.billing_unit === 'second' ? t('按秒计费') : t('按次计费');
     return <Tag color='teal' shape='circle'>{label}</Tag>;

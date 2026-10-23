@@ -5265,6 +5265,25 @@
     "Add value": "Add value",
     "Delete parameter": "Delete parameter",
     "Note (shown in model marketplace)": "Note (shown in model marketplace)",
-    "This parameter name is already used by another group": "This parameter name is already used by another group"
+    "This parameter name is already used by another group": "This parameter name is already used by another group",
+    "Reference video duration ({{path}})": "Reference video duration ({{path}})",
+    "Output duration ({{path}})": "Output duration ({{path}})",
+    "reference video seconds": "reference video seconds",
+    "output seconds": "output seconds",
+    "{{name}} multiplier": "{{name}} multiplier",
+    "{{video}}s reference video, {{output}}s output": "{{video}}s reference video, {{output}}s output",
+    "{{output}}s output": "{{output}}s output",
+    "Values not listed are billed at ×1.": "Values not listed are billed at ×1.",
+    "Billing formula": "Billing formula",
+    "before group ratio": "before group ratio",
+    "Billing Note": "Billing Note",
+    "This model uses dynamic pricing. Please contact the administrator for details.": "This model uses dynamic pricing. Please contact the administrator for details.",
+    "Model marketplace display": "Model marketplace display",
+    "The model marketplace shows this pricing in a readable form. Notes below are display-only and do not affect billing.": "The model marketplace shows this pricing in a readable form. Notes below are display-only and do not affect billing.",
+    "This expression cannot be shown in a readable form. The model marketplace hides the expression and shows only the billing note below.": "This expression cannot be shown in a readable form. The model marketplace hides the expression and shows only the billing note below.",
+    "Explain how this model is billed, e.g. ¥0.18 per second of output plus reference video length.": "Explain how this model is billed, e.g. ¥0.18 per second of output plus reference video length.",
+    "incl. reference video": "incl. reference video",
+    "Prices are adjusted by request conditions": "Prices are adjusted by request conditions",
+    "Per call": "Per call"
   }
 }

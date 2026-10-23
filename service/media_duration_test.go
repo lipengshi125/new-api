@@ -77,6 +77,8 @@ func TestProbeVideoURLsSeconds(t *testing.T) {
 	files := map[string][]byte{
 		"/a.mp4":    buildTestMP4(10, videoRangeBlockSize+1024),
 		"/b.mp4":    buildTestMP4(2.5, 100),
+		"/down.mp4": buildTestMP4(10.4, 100),
+		"/up.mp4":   buildTestMP4(10.6, 100),
 		"/huge.mp4": buildTestMP4(4000, 100),
 		"/bad.mp4":  []byte("this is not a video"),
 	}
@@ -88,10 +90,18 @@ func TestProbeVideoURLsSeconds(t *testing.T) {
 			name = "full download"
 		}
 
-		t.Run(name+"/sums durations", func(t *testing.T) {
+		t.Run(name+"/sums whole-second durations", func(t *testing.T) {
+			// 10s + 2.5s：每个视频先四舍五入到整秒（2.5→3），按整秒计费
 			seconds, err := ProbeVideoURLsSeconds(context.Background(), []string{server.URL + "/a.mp4", server.URL + "/b.mp4"})
 			require.NoError(t, err)
-			assert.InDelta(t, 12.5, seconds, 1e-9)
+			assert.Equal(t, 13.0, seconds)
+		})
+
+		t.Run(name+"/rounds each video to whole seconds", func(t *testing.T) {
+			// 10.4s→10，10.6s→11：舍入作用于每个视频，不保留小数
+			seconds, err := ProbeVideoURLsSeconds(context.Background(), []string{server.URL + "/down.mp4", server.URL + "/up.mp4"})
+			require.NoError(t, err)
+			assert.Equal(t, 21.0, seconds)
 		})
 
 		t.Run(name+"/clamps to max", func(t *testing.T) {

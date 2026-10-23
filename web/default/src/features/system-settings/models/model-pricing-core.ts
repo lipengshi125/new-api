@@ -88,6 +88,8 @@ export type ModelRatioData = {
   customRatios?: Record<string, Record<string, number>>
   // 自定义倍率备注（仅展示，不参与计费）：param_name -> param_value -> note
   customRatioNotes?: Record<string, Record<string, string>>
+  // 计费说明（仅展示）：识别不了的表达式在模型广场只展示这段说明
+  billingNote?: string
 }
 
 export type PreviewRow = {

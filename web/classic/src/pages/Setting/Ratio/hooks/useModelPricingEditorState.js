@@ -17,7 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useEffect, useMemo, useState } from 'react';
-import { API, showError, showSuccess } from '../../../../helpers';
+import {
+  API,
+  parseTaskExprPricing,
+  showError,
+  showSuccess,
+} from '../../../../helpers';
 import {
   combineBillingExpr,
   splitBillingExprAndRequestRules,
@@ -45,6 +50,7 @@ const EMPTY_MODEL = {
   requestRuleExpr: '',
   customRatios: {},
   customRatioNotes: {},
+  billingNote: '',
   rawRatios: {
     modelRatio: '',
     completionRatio: '',
@@ -174,6 +180,7 @@ const buildModelState = (name, sourceMaps) => {
   const billingUnit = sourceMaps.ModelPriceUnit?.[name] || inferBillingUnit(name);
   const customRatios = sourceMaps.CustomRatios?.[name] || {};
   const customRatioNotes = sourceMaps.CustomRatioNotes?.[name] || {};
+  const billingNote = sourceMaps.ModelBillingNotes?.[name] || '';
   const inputPrice = ratioToBasePrice(modelRatio);
   const inputPriceNumber = toNumberOrNull(inputPrice);
   const audioInputPrice =
@@ -189,6 +196,7 @@ const buildModelState = (name, sourceMaps) => {
     billingUnit,
     customRatios,
     customRatioNotes,
+    billingNote,
     inputPrice,
     completionRatioLocked: completionRatioMeta.locked,
     lockedCompletionRatio: completionRatioMeta.ratio,
@@ -688,6 +696,7 @@ export function useModelPricingEditorState({
       // 保存时反而把后端已存的自定义倍率清空。
       CustomRatios: parseOptionJSON(options.CustomRatios),
       CustomRatioNotes: parseOptionJSON(options.CustomRatioNotes),
+      ModelBillingNotes: parseOptionJSON(options.ModelBillingNotes),
     };
 
     const names = new Set([
@@ -1094,6 +1103,12 @@ export function useModelPricingEditorState({
     return true;
   };
 
+  const handleBillingNoteChange = (modelName, note) => {
+    setModels((prev) =>
+      prev.map((m) => (m.name === modelName ? { ...m, billingNote: note } : m)),
+    );
+  };
+
   const handleCustomRatiosChange = (
     modelName,
     newCustomRatios,
@@ -1127,6 +1142,7 @@ export function useModelPricingEditorState({
         AudioCompletionRatio: {},
         CustomRatios: {},
         CustomRatioNotes: {},
+        ModelBillingNotes: {},
       };
 
       const tieredOutput = {
@@ -1171,13 +1187,12 @@ export function useModelPricingEditorState({
             model.billingUnit === 'second' ? 'second' : 'request';
         }
 
-        // Save customRatios if present
-        if (model.customRatios && Object.keys(model.customRatios).length > 0) {
-          output.CustomRatios[model.name] = model.customRatios;
-          // 备注只保留仍存在的参数值，且去掉空白备注
+        // 参数倍率备注只保留仍存在的参数值，且去掉空白备注。
+        // 按次/按秒模型的参数来自 customRatios；表达式模型来自表达式中的参数条件。
+        const collectNotes = (valueMapsByParam) => {
           const notes = {};
-          Object.entries(model.customRatios).forEach(([paramName, valueMap]) => {
-            Object.keys(valueMap || {}).forEach((paramValue) => {
+          Object.entries(valueMapsByParam).forEach(([paramName, values]) => {
+            values.forEach((paramValue) => {
               const note = String(
                 model.customRatioNotes?.[paramName]?.[paramValue] ?? '',
               ).trim();
@@ -1189,6 +1204,33 @@ export function useModelPricingEditorState({
           if (Object.keys(notes).length > 0) {
             output.CustomRatioNotes[model.name] = notes;
           }
+        };
+
+        // Save customRatios if present（与原逻辑一致，各计费模式都保留）
+        if (model.customRatios && Object.keys(model.customRatios).length > 0) {
+          output.CustomRatios[model.name] = model.customRatios;
+        }
+
+        const params = {};
+        if (model.billingMode === 'tiered_expr') {
+          const taskPricing = parseTaskExprPricing(
+            combineBillingExpr(model.billingExpr, model.requestRuleExpr),
+          );
+          (taskPricing?.multipliers || []).forEach((m) => {
+            params[m.name] = [...(params[m.name] || []), m.value];
+          });
+        } else {
+          Object.entries(model.customRatios || {}).forEach(
+            ([paramName, valueMap]) => {
+              params[paramName] = Object.keys(valueMap || {});
+            },
+          );
+        }
+        collectNotes(params);
+
+        const billingNote = String(model.billingNote || '').trim();
+        if (billingNote) {
+          output.ModelBillingNotes[model.name] = billingNote;
         }
       }
 
@@ -1250,6 +1292,7 @@ export function useModelPricingEditorState({
     handleBillingExprChange,
     handleRequestRuleExprChange,
     handleCustomRatiosChange,
+    handleBillingNoteChange,
     handleSubmit,
     addModel,
     deleteModel,

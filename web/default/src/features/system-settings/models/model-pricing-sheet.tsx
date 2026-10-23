@@ -62,9 +62,11 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { combineBillingExpr } from '@/features/pricing/lib/billing-expr'
 import { cn } from '@/lib/utils'
 
 import { CustomRatiosTable } from './custom-ratios-table'
+import { ExprDisplaySettings } from './expr-display-settings'
 import {
   EMPTY_LANE_ENABLED,
   EMPTY_LANE_PRICES,
@@ -167,6 +169,7 @@ export const ModelPricingEditorPanel = forwardRef<
   const [customRatioNotes, setCustomRatioNotes] = useState<
     Record<string, Record<string, string>>
   >({})
+  const [billingNote, setBillingNote] = useState('')
   const isEditMode = !!editData
 
   const form = useForm<ModelPricingFormValues>({
@@ -211,6 +214,7 @@ export const ModelPricingEditorPanel = forwardRef<
       setBillingUnit(editData.billingUnit || inferBillingUnit(editData.name))
       setCustomRatios(editData.customRatios ?? {})
       setCustomRatioNotes(editData.customRatioNotes ?? {})
+      setBillingNote(editData.billingNote ?? '')
     } else {
       form.reset({
         name: '',
@@ -229,6 +233,7 @@ export const ModelPricingEditorPanel = forwardRef<
       setBillingUnit('request')
       setCustomRatios({})
       setCustomRatioNotes({})
+      setBillingNote('')
     }
 
     setPromptPrice(nextLaneState.promptPrice)
@@ -484,6 +489,7 @@ export const ModelPricingEditorPanel = forwardRef<
       // persist step needs to see that to drop the model's stored entry.
       data.customRatios = customRatios
       data.customRatioNotes = customRatioNotes
+      data.billingNote = billingNote.trim()
 
       return data
     },
@@ -494,6 +500,7 @@ export const ModelPricingEditorPanel = forwardRef<
       requestRuleExpr,
       customRatios,
       customRatioNotes,
+      billingNote,
     ]
   )
 
@@ -702,6 +709,18 @@ export const ModelPricingEditorPanel = forwardRef<
                     </FieldGroup>
                   </TabsContent>
                 </Tabs>
+
+                {/* 表达式模式：参数倍率备注 + 计费说明（仅用于模型广场展示） */}
+                {pricingMode === 'tiered_expr' && (
+                  <ExprDisplaySettings
+                    key={editorReloadToken}
+                    expr={combineBillingExpr(billingExpr, requestRuleExpr)}
+                    notes={customRatioNotes}
+                    onNotesChange={setCustomRatioNotes}
+                    billingNote={billingNote}
+                    onBillingNoteChange={setBillingNote}
+                  />
+                )}
 
                 {/* 自定义倍率参数 */}
                 {pricingMode !== 'tiered_expr' && (

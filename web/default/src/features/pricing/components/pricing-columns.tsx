@@ -38,11 +38,17 @@ import { isTokenBasedModel } from '../lib/model-helpers'
 import {
   formatPrice,
   formatRequestPrice,
+  formatTaskUnitPrice,
   stripTrailingZeros,
 } from '../lib/price'
+import { parseTaskExprPricing } from '../lib/task-expr'
 import type { PricingModel, TokenUnit } from '../types'
-import { CustomRatiosSummary } from './custom-ratios-summary'
+import {
+  CustomRatiosSummary,
+  TaskMultipliersSummary,
+} from './custom-ratios-summary'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
+import { TaskUnitLabel } from './task-expr-pricing'
 
 // ----------------------------------------------------------------------------
 // Pricing Table Columns
@@ -127,18 +133,42 @@ export function usePricingColumns(
         })
 
         if (dynamicSummary) {
+          const taskPricing = parseTaskExprPricing(model.billing_expr)
+          if (taskPricing) {
+            return (
+              <div className='max-w-full min-w-0'>
+                <span className='font-mono text-sm tabular-nums'>
+                  {stripTrailingZeros(
+                    formatTaskUnitPrice(
+                      taskPricing.unitPrice,
+                      getDynamicDisplayGroupRatio(model, selectedGroup),
+                      showRechargePrice,
+                      priceRate,
+                      usdExchangeRate
+                    )
+                  )}
+                </span>
+                <div className='text-muted-foreground/50 text-[10px]'>
+                  / <TaskUnitLabel pricing={taskPricing} />
+                  {taskPricing.secondsSources.some((s) => s.kind === 'video') &&
+                    ` · ${t('incl. reference video')}`}
+                </div>
+                <TaskMultipliersSummary model={model} pricing={taskPricing} />
+              </div>
+            )
+          }
+          // 识别不了的表达式：不展示原始表达式
           if (dynamicSummary.isSpecialExpression) {
             return (
               <div className='max-w-full min-w-0'>
-                <div className='text-xs font-medium text-amber-700 dark:text-amber-300'>
-                  {t('Special billing expression')}
-                </div>
-                <div className='text-muted-foreground text-[11px]'>
-                  {t('Unable to parse structured pricing')}
-                </div>
-                <code className='text-muted-foreground/70 mt-1 line-clamp-2 block font-mono text-[10px] leading-relaxed break-all'>
-                  {dynamicSummary.rawExpression}
-                </code>
+                <span className='text-muted-foreground text-xs'>
+                  {t('Dynamic Pricing')}
+                </span>
+                {model.billing_note && (
+                  <div className='text-muted-foreground/80 mt-0.5 line-clamp-2 text-[11px] wrap-break-word'>
+                    {model.billing_note}
+                  </div>
+                )}
               </div>
             )
           }
@@ -258,12 +288,11 @@ export function usePricingColumns(
         })
 
         if (dynamicSummary) {
-          if (dynamicSummary.isSpecialExpression) {
-            return (
-              <span className='text-muted-foreground/50 text-xs'>
-                {t('Special billing expression')}
-              </span>
-            )
+          if (
+            dynamicSummary.isSpecialExpression ||
+            parseTaskExprPricing(model.billing_expr)
+          ) {
+            return <span className='text-muted-foreground/30 text-xs'>—</span>
           }
 
           const cacheEntry = dynamicSummary.entries.find(

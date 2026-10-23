@@ -310,6 +310,8 @@ export function evalExprLocally(
       // 预览没有真实请求上下文：请求参数/请求头视为未传，时间函数取本地当前时间
       param: () => null,
       video_seconds: () => 0,
+      // fixed(amount)：每次固定价格，与后端一致换算为 $/1M 系数
+      fixed: (amount: number) => Number(amount) * 1_000_000,
       header: () => '',
       has: (source: unknown, substr: string) =>
         source != null && !!substr && String(source).includes(substr),

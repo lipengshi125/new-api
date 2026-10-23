@@ -775,6 +775,25 @@ func UpdateCustomRatioNotesByJSONString(jsonStr string) error {
 	return types.LoadFromJsonStringWithCallback(customRatioNotesMap, jsonStr, InvalidateExposedDataCache)
 }
 
+// modelBillingNotesMap stores an admin-written billing explanation per model,
+// shown in the model marketplace (e.g. for expression pricing that cannot be
+// rendered structurally). Display-only; never read by billing.
+var modelBillingNotesMap = types.NewRWMap[string, string]()
+
+func ModelBillingNotes2JSONString() string {
+	return modelBillingNotesMap.MarshalJSONString()
+}
+
+func UpdateModelBillingNotesByJSONString(jsonStr string) error {
+	return types.LoadFromJsonStringWithCallback(modelBillingNotesMap, jsonStr, InvalidateExposedDataCache)
+}
+
+// GetModelBillingNote returns the billing note for a model, or "".
+func GetModelBillingNote(modelName string) string {
+	note, _ := modelBillingNotesMap.Get(FormatMatchingModelName(modelName))
+	return note
+}
+
 // GetCustomRatioNotes returns the custom ratio notes for a model, or nil.
 func GetCustomRatioNotes(modelName string) map[string]map[string]string {
 	if notes, ok := customRatioNotesMap.Get(FormatMatchingModelName(modelName)); ok {

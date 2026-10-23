@@ -76,6 +76,7 @@ Powered by [expr-lang/expr](https://github.com/expr-lang/expr). Expressions are 
 | Function | Signature | Purpose |
 |----------|-----------|---------|
 | `tier` | `tier(name, value) → float64` | Records which pricing tier matched; must wrap the cost expression |
+| `fixed` | `fixed(amount) → float64` | Flat per-call price in USD, e.g. `tier("base", fixed(0.16))`. Equivalent to the scaled form `tier("base", 160000)` (returns `amount * 1e6`). Ported from upstream new-api. Validated at compile time, including unselected branches: `fixed()` must be the direct price of a `tier()` leaf, its argument a finite non-negative numeric literal, and it may only be combined with conditional tiers and `(cond ? r : 1)` request multipliers — never with token prices in the same leaf. Unlike upstream, async task models may use it |
 | `param` | `param(path) → any` | Reads a JSON path from the request body (uses gjson) |
 | `header` | `header(key) → string` | Reads a request header value |
 | `has` | `has(source, substr) → bool` | Substring check |

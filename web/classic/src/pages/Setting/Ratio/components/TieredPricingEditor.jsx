@@ -760,6 +760,12 @@ function VisualEditor({ visualConfig, onChange, t }) {
 
 const PRESET_GROUPS = [
   {
+    group: '按次',
+    presets: [
+      { key: 'per-call-fixed', label: 'Per call ($0.16)', expr: 'tier("base", fixed(0.16))' },
+    ],
+  },
+  {
     group: '固定价格',
     presets: [
       { key: 'flat', label: 'Flat', expr: 'tier("base", p * 2 + c * 4)' },
@@ -889,6 +895,7 @@ function RawExprEditor({ exprString, onChange, t }) {
             </div>
             <div>
               {t('函数')}: <code>tier(name, value)</code>,{' '}
+              <code>fixed(amount)</code>,{' '}
               <code>max(a, b)</code>, <code>min(a, b)</code>,{' '}
               <code>ceil(x)</code>, <code>floor(x)</code>,{' '}
               <code>abs(x)</code>, <code>header(name)</code>,{' '}
@@ -975,7 +982,16 @@ function evalExprLocally(exprStr, p, c, extraTokenValues) {
     const cacheCreateTokens = extraTokenValues.cacheCreateTokens || 0;
     const cacheCreate1hTokens = extraTokenValues.cacheCreate1hTokens || 0;
     const len = p + cacheReadTokens + cacheCreateTokens + cacheCreate1hTokens;
-    const env = { p, c, len, tier: tierFn, max: Math.max, min: Math.min, abs: Math.abs, ceil: Math.ceil, floor: Math.floor };
+    const env = {
+      p, c, len, tier: tierFn, max: Math.max, min: Math.min, abs: Math.abs, ceil: Math.ceil, floor: Math.floor,
+      // 与后端一致：fixed(amount) 换算为 $/1M 系数；预览无请求上下文，param 视为未传
+      fixed: (amount) => Number(amount) * 1000000,
+      param: () => null,
+      header: () => '',
+      has: () => false,
+      video_seconds: () => 0,
+      float: (v) => Number(v ?? 0),
+    };
     for (const field of EXTRA_ESTIMATOR_FIELDS) {
       env[field.var] = extraTokenValues[field.stateKey] || 0;
     }
@@ -1262,6 +1278,7 @@ p 和 c 是兜底变量，代表所有没有被表达式单独定价的 token。
 ### 内置函数
 
 - tier(name, value) — 标记计费档位名称，必须包裹费用表达式
+- fixed(amount) — 每次固定价格（美元），作为档位价格使用：tier("base", fixed(0.16))。只能填数字常量，不能和 token 价格写在同一个档位里，可以再乘 (条件 ? 倍率 : 1) 这类请求条件倍率。按次计费的模型优先用它
 - max(a, b)、min(a, b) — 取大/小值
 - ceil(x)、floor(x)、abs(x) — 向上取整、向下取整、绝对值
 - header(name) — 读取请求头

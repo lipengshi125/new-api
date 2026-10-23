@@ -53,6 +53,8 @@ import {
 import { useIsMobile } from '../../../../hooks/common/useIsMobile';
 import TieredPricingEditor from './TieredPricingEditor';
 import CustomRatiosEditor from './CustomRatiosEditor';
+import ExprDisplaySettings from './ExprDisplaySettings';
+import { combineBillingExpr } from './requestRuleExpr';
 
 const { Text } = Typography;
 const EMPTY_CANDIDATE_MODEL_NAMES = [];
@@ -132,6 +134,7 @@ export default function ModelPricingEditor({
     handleBillingExprChange,
     handleRequestRuleExprChange,
     handleCustomRatiosChange,
+    handleBillingNoteChange,
     handleSubmit,
     addModel,
     deleteModel,
@@ -505,13 +508,34 @@ export default function ModelPricingEditor({
                     extraText={t('适合 MJ / 任务类等按次收费模型。')}
                   />
                 ) : selectedModel.billingMode === 'tiered_expr' ? (
-                  <TieredPricingEditor
-                    model={selectedModel}
-                    onExprChange={handleBillingExprChange}
-                    requestRuleExpr={selectedModel.requestRuleExpr}
-                    onRequestRuleExprChange={handleRequestRuleExprChange}
-                    t={t}
-                  />
+                  <>
+                    <TieredPricingEditor
+                      model={selectedModel}
+                      onExprChange={handleBillingExprChange}
+                      requestRuleExpr={selectedModel.requestRuleExpr}
+                      onRequestRuleExprChange={handleRequestRuleExprChange}
+                      t={t}
+                    />
+                    <ExprDisplaySettings
+                      expr={combineBillingExpr(
+                        selectedModel.billingExpr,
+                        selectedModel.requestRuleExpr,
+                      )}
+                      notes={selectedModel.customRatioNotes || {}}
+                      billingNote={selectedModel.billingNote || ''}
+                      onNotesChange={(notes) =>
+                        handleCustomRatiosChange(
+                          selectedModel.name,
+                          selectedModel.customRatios || {},
+                          notes,
+                        )
+                      }
+                      onBillingNoteChange={(note) =>
+                        handleBillingNoteChange(selectedModel.name, note)
+                      }
+                      t={t}
+                    />
+                  </>
                 ) : (
                   <>
                     <Card

@@ -175,6 +175,47 @@ func TestModelPriceHelperTieredTaskMultipart(t *testing.T) {
 	assert.Equal(t, common.QuotaRound(0.18*1.75*4*common.QuotaPerUnit), priceData.Quota)
 }
 
+func TestModelPriceHelperTieredTaskFixedPrice(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	saved := map[string]string{}
+	require.NoError(t, config.GlobalConfig.SaveToDB(func(key, value string) error {
+		saved[key] = value
+		return nil
+	}))
+	t.Cleanup(func() {
+		require.NoError(t, config.GlobalConfig.LoadFromDB(saved))
+	})
+
+	// fixed(0.15) 与旧写法 150000 必须扣相同额度，任务模型同样可用
+	exprJSON, err := common.Marshal(map[string]string{
+		"task-image-fixed":  `tier("base", fixed(0.15)) * (param("resolution") == "4k" ? 1.6 : 1)`,
+		"task-image-legacy": `tier("base", 150000) * (param("resolution") == "4k" ? 1.6 : 1)`,
+	})
+	require.NoError(t, err)
+	require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{
+		"billing_setting.billing_mode":    `{"task-image-fixed":"tiered_expr","task-image-legacy":"tiered_expr"}`,
+		"billing_setting.billing_expr":    string(exprJSON),
+		"group_ratio_setting.group_ratio": `{"default":1}`,
+	}))
+
+	quotaFor := func(modelName, body string) int {
+		req := httptest.NewRequest(http.MethodPost, "/v1/images/generations", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx, info := newTaskExprContext(req, "default")
+		info.OriginModelName = modelName
+		priceData, err := ModelPriceHelperTieredTask(ctx, info)
+		require.NoError(t, err)
+		return priceData.Quota
+	}
+
+	for _, body := range []string{`{"resolution":"1k"}`, `{"resolution":"4k"}`} {
+		fixedQuota := quotaFor("task-image-fixed", body)
+		assert.Equal(t, quotaFor("task-image-legacy", body), fixedQuota, body)
+	}
+	assert.Equal(t, common.QuotaRound(0.15*1.6*common.QuotaPerUnit), quotaFor("task-image-fixed", `{"resolution":"4k"}`))
+}
+
 func TestModelPriceHelperTieredTaskRejects(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	loadTaskExprBillingConfig(t)

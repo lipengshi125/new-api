@@ -240,6 +240,30 @@ export function formatFixedPrice(
 }
 
 /**
+ * Format a task-expression unit price (USD per call / per second) with the
+ * group ratio and recharge-rate display applied, matching per-call prices.
+ */
+export function formatTaskUnitPrice(
+  unitPriceUSD: number,
+  groupRatio = 1,
+  showWithRecharge = false,
+  priceRate = 1,
+  usdExchangeRate = 1
+): string {
+  const priceInUSD = applyRechargeRate(
+    unitPriceUSD * groupRatio,
+    showWithRecharge,
+    priceRate,
+    usdExchangeRate
+  )
+  return formatCurrencyFromUSD(priceInUSD, {
+    digitsLarge: 4,
+    digitsSmall: 4,
+    abbreviate: false,
+  })
+}
+
+/**
  * Format fixed price for pay-per-request models (minimum price from all groups)
  */
 export function formatRequestPrice(

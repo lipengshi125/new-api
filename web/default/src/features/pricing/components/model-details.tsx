@@ -68,7 +68,12 @@ import {
 } from '../lib/dynamic-price'
 import { parseTags } from '../lib/filters'
 import { getAvailableGroups, isTokenBasedModel } from '../lib/model-helpers'
-import { formatFixedPrice, formatGroupPrice } from '../lib/price'
+import {
+  formatFixedPrice,
+  formatGroupPrice,
+  formatTaskUnitPrice,
+} from '../lib/price'
+import { parseTaskExprPricing } from '../lib/task-expr'
 import type {
   CodeSampleMap,
   ModelCapability,
@@ -80,6 +85,10 @@ import { DynamicPricingBreakdown } from './dynamic-pricing-breakdown'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelDetailsApi } from './model-details-api'
 import { ModelDetailsPerformance } from './model-details-performance'
+import {
+  TaskExprPricingDetails,
+  UnrecognizedExprPricing,
+} from './task-expr-pricing'
 
 // ----------------------------------------------------------------------------
 // Local UI helpers
@@ -626,26 +635,28 @@ function PriceSection(props: {
   ]
 
   if (dynamicSummary) {
+    // 任务模型（按次/按秒）的表达式：展示计费方式、单价、秒数、参数倍率、公式与示例
+    const taskPricing = parseTaskExprPricing(props.model.billing_expr)
+    if (taskPricing) {
+      return (
+        <section>
+          <SectionTitle>{t('Base Price')}</SectionTitle>
+          <TaskExprPricingDetails
+            model={props.model}
+            pricing={taskPricing}
+            showRechargePrice={props.showRechargePrice}
+            priceRate={props.priceRate}
+            usdExchangeRate={props.usdExchangeRate}
+          />
+        </section>
+      )
+    }
+    // 识别不了的表达式：只展示计费说明，不暴露原始表达式
     if (dynamicSummary.isSpecialExpression) {
       return (
         <section>
           <SectionTitle>{t('Base Price')}</SectionTitle>
-          <div className='rounded-lg border border-amber-200/70 bg-amber-50/70 p-3 dark:border-amber-500/20 dark:bg-amber-500/10'>
-            <div className='text-sm font-medium text-amber-800 dark:text-amber-200'>
-              {t('Special billing expression')}
-            </div>
-            <p className='text-muted-foreground mt-1 text-xs'>
-              {t('Unable to parse structured pricing')}
-            </p>
-            <div className='mt-3'>
-              <div className='text-muted-foreground mb-1 text-[10px] font-medium tracking-wider uppercase'>
-                {t('Raw expression')}
-              </div>
-              <code className='text-muted-foreground bg-background/80 block max-h-28 overflow-auto rounded-md border px-2 py-1.5 font-mono text-xs break-all'>
-                {dynamicSummary.rawExpression}
-              </code>
-            </div>
-          </div>
+          <UnrecognizedExprPricing model={props.model} />
         </section>
       )
     }
@@ -915,30 +926,86 @@ function GroupPricingSection(props: {
 
   if (isDynamicPricingModel(props.model)) {
     const dynamicTiers = getDynamicPricingTiers(props.model)
+    const taskPricing = parseTaskExprPricing(props.model.billing_expr)
 
+    // 任务模型：按分组展示「¥x / 秒（或次）」，倍率另见上方参数倍率表
+    if (taskPricing) {
+      const unitLabel = taskPricing.unit === 'second' ? t('sec') : t('request')
+      return (
+        <section>
+          <SectionTitle>{t('Pricing by Group')}</SectionTitle>
+          <AutoGroupChain model={props.model} autoGroups={props.autoGroups} />
+          <StaticDataTable
+            className='-mx-4 rounded-none border-0 sm:mx-0'
+            tableClassName='text-sm'
+            headerRowClassName='hover:bg-transparent'
+            data={availableGroups}
+            getRowKey={(group) => group}
+            columns={[
+              {
+                id: 'group',
+                header: t('Group'),
+                className: thClass,
+                cellClassName: 'py-2.5',
+                cell: (group) => <GroupBadge group={group} size='sm' />,
+              },
+              {
+                id: 'ratio',
+                header: t('Ratio'),
+                className: thClass,
+                cellClassName: 'text-muted-foreground py-2.5 font-mono',
+                cell: (group) => `${props.groupRatio[group] || 1}x`,
+              },
+              {
+                id: 'price',
+                header: t('Base Price'),
+                className: `${thClass} text-right`,
+                cellClassName: 'py-2.5 text-right font-mono',
+                cell: (group) =>
+                  `${formatTaskUnitPrice(
+                    taskPricing.unitPrice,
+                    props.groupRatio[group] || 1,
+                    showRechargePrice,
+                    props.priceRate,
+                    props.usdExchangeRate
+                  )} / ${unitLabel}`,
+              },
+            ]}
+          />
+        </section>
+      )
+    }
+
+    // 识别不了的表达式：分组价格无法展开，只显示分组倍率
     if (dynamicTiers.length === 0) {
       return (
         <section>
           <SectionTitle>{t('Pricing by Group')}</SectionTitle>
           <AutoGroupChain model={props.model} autoGroups={props.autoGroups} />
-          <div className='rounded-lg border border-amber-200/70 bg-amber-50/70 p-3 dark:border-amber-500/20 dark:bg-amber-500/10'>
-            <div className='text-sm font-medium text-amber-800 dark:text-amber-200'>
-              {t('Special billing expression')}
-            </div>
-            <p className='text-muted-foreground mt-1 text-xs'>
-              {t(
-                'Group prices cannot be expanded because this expression is not a standard tiered pricing expression.'
-              )}
-            </p>
-            <div className='mt-3'>
-              <div className='text-muted-foreground mb-1 text-[10px] font-medium tracking-wider uppercase'>
-                {t('Raw expression')}
-              </div>
-              <code className='text-muted-foreground bg-background/80 block max-h-28 overflow-auto rounded-md border px-2 py-1.5 font-mono text-xs break-all'>
-                {props.model.billing_expr}
-              </code>
-            </div>
-          </div>
+          <StaticDataTable
+            className='-mx-4 rounded-none border-0 sm:mx-0'
+            tableClassName='text-sm'
+            headerRowClassName='hover:bg-transparent'
+            data={availableGroups}
+            getRowKey={(group) => group}
+            columns={[
+              {
+                id: 'group',
+                header: t('Group'),
+                className: thClass,
+                cellClassName: 'py-2.5',
+                cell: (group) => <GroupBadge group={group} size='sm' />,
+              },
+              {
+                id: 'ratio',
+                header: t('Ratio'),
+                className: `${thClass} text-right`,
+                cellClassName:
+                  'text-muted-foreground py-2.5 text-right font-mono',
+                cell: (group) => `${props.groupRatio[group] || 1}x`,
+              },
+            ]}
+          />
         </section>
       )
     }
@@ -994,13 +1061,19 @@ function GroupPricingSection(props: {
                     `${group}-${tier.label || tierIndex}`
                   }
                   columns={[
-                    {
-                      id: 'tier',
-                      header: t('Tier'),
-                      className: thClass,
-                      cellClassName: 'text-muted-foreground py-2.5',
-                      cell: (tier) => tier.label || t('Default'),
-                    },
+                    // 只有一个档位时档位名（如 base）对用户没有意义，不显示该列
+                    ...(dynamicTiers.length > 1
+                      ? [
+                          {
+                            id: 'tier',
+                            header: t('Tier'),
+                            className: thClass,
+                            cellClassName: 'text-muted-foreground py-2.5',
+                            cell: (tier: (typeof dynamicTiers)[number]) =>
+                              tier.label || t('Default'),
+                          },
+                        ]
+                      : []),
                     ...priceFields.map((fieldEntry) => ({
                       id: fieldEntry.field,
                       header: t(fieldEntry.shortLabel),
@@ -1228,9 +1301,12 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
   const { t } = useTranslation()
   const showRechargePrice = props.showRechargePrice ?? false
 
-  const isDynamic =
-    props.model.billing_mode === 'tiered_expr' &&
-    Boolean(props.model.billing_expr)
+  // 只有面向 token 的分档表达式才展示分档价格表；任务表达式和识别不了的表达式
+  // 已在「基础价格」中以用户可读的方式展示
+  const isTokenTierExpr =
+    isDynamicPricingModel(props.model) &&
+    !parseTaskExprPricing(props.model.billing_expr) &&
+    getDynamicPricingTiers(props.model).length > 0
 
   return (
     <div className='@container/details space-y-4'>
@@ -1265,8 +1341,11 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
               tokenUnit={props.tokenUnit}
               showRechargePrice={showRechargePrice}
             />
-            {isDynamic && (
-              <DynamicPricingBreakdown billingExpr={props.model.billing_expr} />
+            {isTokenTierExpr && (
+              <DynamicPricingBreakdown
+                billingExpr={props.model.billing_expr}
+                hideSingleTierTable
+              />
             )}
             <GroupPricingSection
               model={props.model}

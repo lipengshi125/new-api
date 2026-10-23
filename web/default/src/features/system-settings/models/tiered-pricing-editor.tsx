@@ -149,6 +149,16 @@ const PRESET_GROUPS: PresetGroup[] = [
     ],
   },
   {
+    group: 'Per call',
+    presets: [
+      {
+        key: 'per-call-fixed',
+        label: 'Per call ($0.16)',
+        expr: 'tier("base", fixed(0.16))',
+      },
+    ],
+  },
+  {
     group: 'Tiered',
     presets: [
       {
@@ -893,11 +903,11 @@ function RawExprEditor({ exprString, onChange }: RawExprEditorProps) {
             <code>ao</code>
           </div>
           <div>
-            {t('Functions')}: <code>tier(name, value)</code>, <code>max</code>,{' '}
-            <code>min</code>, <code>ceil</code>, <code>floor</code>,{' '}
-            <code>abs</code>, <code>header(name)</code>,{' '}
-            <code>param(path)</code>, <code>has(source, text)</code>,{' '}
-            <code>video_seconds(path)</code>
+            {t('Functions')}: <code>tier(name, value)</code>,{' '}
+            <code>fixed(amount)</code>, <code>max</code>, <code>min</code>,{' '}
+            <code>ceil</code>, <code>floor</code>, <code>abs</code>,{' '}
+            <code>header(name)</code>, <code>param(path)</code>,{' '}
+            <code>has(source, text)</code>, <code>video_seconds(path)</code>
           </div>
         </AlertDescription>
       </Alert>
@@ -1505,6 +1515,7 @@ Important: len is NOT affected by auto-exclusion. Tier conditions should use len
 ### Built-in Functions
 
 - tier(name, value) — labels the billing tier; must wrap the cost expression
+- fixed(amount) — flat per-call price in USD, used as the tier price: tier("base", fixed(0.16)). Must be a numeric literal and cannot be combined with token prices in the same tier; may be multiplied by (cond ? r : 1) request multipliers. For per-call / per-request models prefer this over token variables
 - max(a, b), min(a, b) — maximum/minimum
 - ceil(x), floor(x), abs(x) — ceiling, floor, absolute value
 - header(name) — reads a request header

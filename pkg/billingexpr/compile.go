@@ -8,6 +8,7 @@ import (
 
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/ast"
+	"github.com/expr-lang/expr/parser"
 	"github.com/expr-lang/expr/vm"
 )
 
@@ -50,6 +51,7 @@ var compileEnvPrototypeV1 = map[string]interface{}{
 	"ai":   float64(0),
 	"ao":   float64(0),
 	"tier":                   func(string, float64) float64 { return 0 },
+	"fixed":                  func(float64) float64 { return 0 },
 	"header":                 func(string) string { return "" },
 	"param":                  func(string) interface{} { return nil },
 	"has":                    func(interface{}, string) bool { return false },
@@ -64,6 +66,17 @@ var compileEnvPrototypeV1 = map[string]interface{}{
 	"abs":                    math.Abs,
 	"ceil":                   math.Ceil,
 	"floor":                  math.Floor,
+}
+
+// parseExprTree parses the expression body (version prefix stripped) into an
+// AST without type checking or optimization.
+func parseExprTree(exprStr string) (ast.Node, error) {
+	_, body := ParseExprVersion(exprStr)
+	tree, err := parser.Parse(body)
+	if err != nil {
+		return nil, err
+	}
+	return tree.Node, nil
 }
 
 func getCompileEnv(version int) map[string]interface{} {
@@ -94,6 +107,16 @@ func compileFromCacheByHash(exprStr, hash string) (*vm.Program, error) {
 	cacheMu.RUnlock()
 
 	version, body := ParseExprVersion(exprStr)
+	// 在编译优化之前校验 fixed()，防止不可达分支里的非法 fixed 绕过校验
+	tree, err := parseExprTree(exprStr)
+	if err != nil {
+		return nil, fmt.Errorf("expr compile error: %w", err)
+	}
+	if containsFixed(tree) {
+		if err := validateFixedPricingTree(tree); err != nil {
+			return nil, fmt.Errorf("expr compile error: %w", err)
+		}
+	}
 	prog, err := expr.Compile(body, expr.Env(getCompileEnv(version)), expr.AsFloat64())
 	if err != nil {
 		return nil, fmt.Errorf("expr compile error: %w", err)

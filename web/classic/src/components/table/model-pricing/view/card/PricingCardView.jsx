@@ -270,7 +270,12 @@ const PricingCardView = ({
                       </h3>
                       <div className='flex flex-col gap-1 text-xs mt-1'>
                         {priceData.isDynamicPricing ? (
-                          formatDynamicPriceSummary(priceData.billingExpr, t, priceData.usedGroupRatio)
+                          formatDynamicPriceSummary(
+                            priceData.billingExpr,
+                            t,
+                            priceData.usedGroupRatio,
+                            priceData.billingNote,
+                          )
                         ) : (
                           formatPriceInfo(priceData, t, siteDisplayType)
                         )}
