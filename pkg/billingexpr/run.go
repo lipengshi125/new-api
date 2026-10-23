@@ -50,9 +50,22 @@ func RunExprByHashWithRequest(exprStr, hash string, params TokenParams, request 
 
 func runProgram(prog *vm.Program, params TokenParams, request RequestInput) (float64, TraceResult, error) {
 	trace := TraceResult{}
+	out, err := expr.Run(prog, newRuntimeEnv(params, request, &trace))
+	if err != nil {
+		return 0, trace, fmt.Errorf("expr run error: %w", err)
+	}
+	f, ok := out.(float64)
+	if !ok {
+		return 0, trace, fmt.Errorf("expr result is %T, want float64", out)
+	}
+	return f, trace, nil
+}
+
+// newRuntimeEnv builds the evaluation environment; tier() records into trace.
+func newRuntimeEnv(params TokenParams, request RequestInput, trace *TraceResult) map[string]interface{} {
 	headers := normalizeHeaders(request.Headers)
 
-	env := map[string]interface{}{
+	return map[string]interface{}{
 		"p":    params.P,
 		"c":    params.C,
 		"len":  params.Len,
@@ -82,6 +95,9 @@ func runProgram(prog *vm.Program, params TokenParams, request RequestInput) (flo
 			}
 			return result.Value()
 		},
+		"video_seconds": func(path string) float64 {
+			return request.MediaSeconds[strings.TrimSpace(path)]
+		},
 		"has": func(source interface{}, substr string) bool {
 			if source == nil || substr == "" {
 				return false
@@ -99,16 +115,6 @@ func runProgram(prog *vm.Program, params TokenParams, request RequestInput) (flo
 		"ceil":  math.Ceil,
 		"floor": math.Floor,
 	}
-
-	out, err := expr.Run(prog, env)
-	if err != nil {
-		return 0, trace, fmt.Errorf("expr run error: %w", err)
-	}
-	f, ok := out.(float64)
-	if !ok {
-		return 0, trace, fmt.Errorf("expr result is %T, want float64", out)
-	}
-	return f, trace, nil
 }
 
 func timeInZone(tz string) time.Time {

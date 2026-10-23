@@ -10,12 +10,14 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
 )
 
 func modelPriceNotConfiguredError(modelName string, userId int) error {
@@ -282,12 +284,58 @@ func ModelPriceHelperTieredTask(c *gin.Context, info *relaycommon.RelayInfo) (ty
 		}
 	}
 
+	// video_seconds("videos")：探测请求中视频 URL 的真实时长后再求值（可能较慢）。
+	// 探测失败直接拒绝请求，避免读不到时长时按 0 秒少扣费。
+	// 只保留探测出的秒数（重试时复用），下载的视频数据在探测结束后即释放。
+	videoPaths, err := billingexpr.VideoSecondsPaths(exprStr)
+	if err != nil {
+		return types.PriceData{}, fmt.Errorf("model %s tiered expr compile failed: %w", info.OriginModelName, err)
+	}
+	if info.TaskExprBilling != nil {
+		requestInput.MediaSeconds = info.TaskExprBilling.MediaSeconds
+	}
+	if requestInput.MediaSeconds == nil {
+		requestInput.MediaSeconds = make(map[string]float64, len(videoPaths))
+	}
+	inputSeconds := 0.0
+	for _, path := range videoPaths {
+		if seconds, probed := requestInput.MediaSeconds[path]; probed {
+			inputSeconds += seconds
+			continue
+		}
+		urls := requestStringList(requestInput.Body, path)
+		seconds := 0.0
+		if len(urls) > 0 {
+			var probeErr error
+			if seconds, probeErr = service.ProbeVideoURLsSeconds(c.Request.Context(), urls); probeErr != nil {
+				return types.PriceData{}, fmt.Errorf("%s: %w", path, probeErr)
+			}
+			logger.LogInfo(c, fmt.Sprintf("probed video duration for billing: %s=%d videos, %.2fs", path, len(urls), seconds))
+		}
+		requestInput.MediaSeconds[path] = seconds
+		inputSeconds += seconds
+	}
+
 	rawCost, trace, err := billingexpr.RunExprWithRequest(exprStr, billingexpr.TokenParams{}, requestInput)
 	if err != nil {
 		return types.PriceData{}, fmt.Errorf("model %s tiered expr run failed: %w", info.OriginModelName, err)
 	}
 	if math.IsNaN(rawCost) || rawCost < 0 {
 		return types.PriceData{}, fmt.Errorf("model %s tiered expr produced invalid cost %v", info.OriginModelName, rawCost)
+	}
+
+	// 输出秒数直接读取用户请求的 duration（兼容 seconds），仅用于日志展示，钳制到 0~3600
+	outputSeconds := gjson.GetBytes(requestInput.Body, "duration").Float()
+	if outputSeconds == 0 {
+		outputSeconds = gjson.GetBytes(requestInput.Body, "seconds").Float()
+	}
+	outputSeconds = max(0, min(float64(relaycommon.MaxTaskDurationSeconds), outputSeconds))
+	info.TaskExprBilling = &relaycommon.TaskExprBilling{
+		HasInputSeconds: len(videoPaths) > 0,
+		InputSeconds:    inputSeconds,
+		OutputSeconds:   outputSeconds,
+		Multipliers:     billingexpr.ExplainParamMultipliers(exprStr, requestInput),
+		MediaSeconds:    requestInput.MediaSeconds,
 	}
 
 	// 表达式系数是 $/1M 单价，与同步表达式计费、按次计费使用同一换算
@@ -315,6 +363,33 @@ func ModelPriceHelperTieredTask(c *gin.Context, info *relaycommon.RelayInfo) (ty
 		QuotaToPreConsume: quota,
 		GroupRatioInfo:    groupRatioInfo,
 	}, nil
+}
+
+// requestStringList 读取请求体中的字符串或字符串数组（gjson 路径），忽略空值。
+// 支持 "videos": ["url", ...]、"video": "url"，以及 [{"url": "..."}] 形式的元素。
+func requestStringList(body []byte, path string) []string {
+	if len(body) == 0 {
+		return nil
+	}
+	result := gjson.GetBytes(body, path)
+	if !result.Exists() {
+		return nil
+	}
+	items := []gjson.Result{result}
+	if result.IsArray() {
+		items = result.Array()
+	}
+	var values []string
+	for _, item := range items {
+		value := item.String()
+		if item.IsObject() {
+			value = item.Get("url").String()
+		}
+		if value = strings.TrimSpace(value); value != "" {
+			values = append(values, value)
+		}
+	}
+	return values
 }
 
 func HasModelBillingConfig(modelName string) bool {

@@ -79,6 +79,7 @@ Powered by [expr-lang/expr](https://github.com/expr-lang/expr). Expressions are 
 | `param` | `param(path) → any` | Reads a JSON path from the request body (uses gjson) |
 | `header` | `header(key) → string` | Reads a request header value |
 | `has` | `has(source, substr) → bool` | Substring check |
+| `video_seconds` | `video_seconds(path) → float64` | Total duration (seconds) of MP4/MOV video URLs at a request body path. Async task billing only: before evaluation the gateway probes each URL via the SSRF-protected client (HTTP Range, falling back to a bounded full download), caps each video and the total at 3600s, and rejects the request if any video cannot be read. The path must be a string literal. Elsewhere it evaluates to 0 |
 | `hour` | `hour(tz) → int` | Current hour in timezone (0-23) |
 | `minute` | `minute(tz) → int` | Current minute (0-59) |
 | `weekday` | `weekday(tz) → int` | Day of week (0=Sunday, 6=Saturday) |

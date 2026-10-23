@@ -6,8 +6,10 @@ import (
 	"io"
 	"mime/multipart"
 	"net/url"
+	"sort"
 
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/gin-gonic/gin"
 	"github.com/tidwall/gjson"
@@ -46,6 +48,8 @@ func ApplyCustomRatios(c *gin.Context, info *relaycommon.RelayInfo, customRatios
 	}
 
 	bodyBytes := readReusableBody(c)
+	// 渠道重试会再次调用，先清空上一次的命中记录
+	info.CustomRatioHits = nil
 
 	for paramName, valueRatioMap := range customRatios {
 		param, exists := lookupCustomRatioParam(c, bodyBytes, paramName)
@@ -53,28 +57,28 @@ func ApplyCustomRatios(c *gin.Context, info *relaycommon.RelayInfo, customRatios
 			continue
 		}
 
+		// 命中记录：精确值记实际值；任意值/按个数记保留值和元素个数
+		hit := billingexpr.ParamMultiplier{Name: paramName}
 		if ratio, ok := valueRatioMap[param.value]; ok {
-			info.PriceData.AddOtherRatio(paramName, ratio)
-			logger.LogDebug(c.Request.Context(), fmt.Sprintf("Applied custom ratio: %s=%s -> x%.2f", paramName, param.value, ratio))
+			hit.Value, hit.Ratio = param.value, ratio
+		} else if param.count == 0 {
 			continue
-		}
-
-		if param.count == 0 {
-			continue
-		}
-
-		if ratio, ok := valueRatioMap[CustomRatioMatchPerItem]; ok {
+		} else if ratio, ok := valueRatioMap[CustomRatioMatchPerItem]; ok {
 			count := min(param.count, MaxCustomRatioItemCount)
-			info.PriceData.AddOtherRatio(paramName, ratio*float64(count))
-			logger.LogDebug(c.Request.Context(), fmt.Sprintf("Applied custom ratio: %s count=%d -> x%.2f", paramName, count, ratio*float64(count)))
+			hit.Value, hit.Count, hit.Ratio = CustomRatioMatchPerItem, count, ratio*float64(count)
+		} else if ratio, ok := valueRatioMap[CustomRatioMatchAny]; ok {
+			hit.Value, hit.Count, hit.Ratio = CustomRatioMatchAny, param.count, ratio
+		} else {
 			continue
 		}
 
-		if ratio, ok := valueRatioMap[CustomRatioMatchAny]; ok {
-			info.PriceData.AddOtherRatio(paramName, ratio)
-			logger.LogDebug(c.Request.Context(), fmt.Sprintf("Applied custom ratio: %s=* -> x%.2f", paramName, ratio))
-		}
+		info.PriceData.AddOtherRatio(paramName, hit.Ratio)
+		info.CustomRatioHits = append(info.CustomRatioHits, hit)
+		logger.LogDebug(c.Request.Context(), fmt.Sprintf("Applied custom ratio: %s=%s (count=%d) -> x%.2f", paramName, hit.Value, hit.Count, hit.Ratio))
 	}
+	sort.Slice(info.CustomRatioHits, func(i, j int) bool {
+		return info.CustomRatioHits[i].Name < info.CustomRatioHits[j].Name
+	})
 }
 
 // readReusableBody 读取原始 body 并恢复，供后续流程继续使用

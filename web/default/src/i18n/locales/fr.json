@@ -5256,6 +5256,11 @@
     "Parameter name can only contain letters, numbers, underscores, hyphens and dots": "Le nom du paramètre ne peut contenir que des lettres, chiffres, traits de soulignement, tirets et points",
     "Exact value: applies when the parameter equals the value. Any value: applies whenever the parameter is present and non-empty. Per item: multiplier × item count (array length; a non-empty single value counts as 1; capped at 128). Use dots for nested fields, e.g. input.images.": "Valeur exacte : s'applique lorsque le paramètre est égal à la valeur. Toute valeur : s'applique dès que le paramètre est présent et non vide. Par élément : multiplicateur × nombre d'éléments (longueur du tableau ; une valeur unique non vide compte pour 1 ; plafonné à 128). Utilisez des points pour les champs imbriqués, par ex. input.images.",
     "When {{name}} is set": "Lorsque {{name}} est défini",
-    "Per item in {{name}}": "Par élément de {{name}}"
+    "Per item in {{name}}": "Par élément de {{name}}",
+    "Input Seconds": "Secondes en entrée",
+    "Output Seconds": "Secondes en sortie",
+    "Billed Seconds": "Secondes facturées",
+    "Not provided": "Non fourni",
+    "{{count}} items": "{{count}} éléments"
   }
 }

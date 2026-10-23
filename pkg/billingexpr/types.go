@@ -10,6 +10,9 @@ import (
 type RequestInput struct {
 	Headers map[string]string
 	Body    []byte
+	// MediaSeconds 保存请求中媒体 URL 的总时长（秒），键为 video_seconds(path) 的 path。
+	// 由调用方在求值前探测并填充（已钳制），表达式本身不做任何网络访问。
+	MediaSeconds map[string]float64
 }
 
 // TokenParams holds all token dimensions passed into an Expr evaluation.

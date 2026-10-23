@@ -5256,6 +5256,11 @@
     "Parameter name can only contain letters, numbers, underscores, hyphens and dots": "パラメータ名には英字、数字、アンダースコア、ハイフン、ドットのみ使用できます",
     "Exact value: applies when the parameter equals the value. Any value: applies whenever the parameter is present and non-empty. Per item: multiplier × item count (array length; a non-empty single value counts as 1; capped at 128). Use dots for nested fields, e.g. input.images.": "完全一致：パラメータが値と等しい場合に適用。任意の値：パラメータが存在し空でなければ適用。項目ごと：倍率 × 項目数（配列は長さ、空でない単一値は 1、上限 128）。ネストしたフィールドはドットで指定します（例：input.images）。",
     "When {{name}} is set": "{{name}} が指定されている場合",
-    "Per item in {{name}}": "{{name}} の項目ごと"
+    "Per item in {{name}}": "{{name}} の項目ごと",
+    "Input Seconds": "入力秒数",
+    "Output Seconds": "出力秒数",
+    "Billed Seconds": "課金秒数",
+    "Not provided": "未指定",
+    "{{count}} items": "{{count}} 件"
   }
 }

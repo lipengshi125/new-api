@@ -3,14 +3,17 @@ package service
 import (
 	"context"
 	"fmt"
+	"math"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
-	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
@@ -22,8 +25,29 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 	tokenName := c.GetString("token_name")
 	logContent := fmt.Sprintf("操作 %s", info.Action)
 	// 支持任务按次、按秒或按表达式计费
-	if billing_setting.GetBillingMode(info.OriginModelName) == billing_setting.BillingModeTieredExpr {
-		logContent = fmt.Sprintf("%s，表达式计费", logContent)
+	if exprBilling := info.TaskExprBilling; exprBilling != nil {
+		// 例：表达式计费：输入 10秒 + 输出 20秒 = 30秒，resolution=720p ×1.75
+		formatSeconds := func(v float64) string {
+			return strconv.FormatFloat(math.Round(v*100)/100, 'f', -1, 64) + "秒"
+		}
+		parts := []string{"输出 " + formatSeconds(exprBilling.OutputSeconds)}
+		if exprBilling.HasInputSeconds {
+			parts = []string{fmt.Sprintf("输入 %s + 输出 %s = %s",
+				formatSeconds(exprBilling.InputSeconds),
+				formatSeconds(exprBilling.OutputSeconds),
+				formatSeconds(exprBilling.InputSeconds+exprBilling.OutputSeconds))}
+		}
+		for _, m := range exprBilling.Multipliers {
+			value := m.Value
+			if value == "" {
+				value = "未传"
+			}
+			if m.Count > 0 {
+				value = fmt.Sprintf("%d个", m.Count)
+			}
+			parts = append(parts, fmt.Sprintf("%s=%s ×%s", m.Name, value, strconv.FormatFloat(m.Ratio, 'f', -1, 64)))
+		}
+		logContent = fmt.Sprintf("%s，表达式计费：%s", logContent, strings.Join(parts, "，"))
 	} else if common.StringsContains(constant.TaskPricePatches, info.OriginModelName) {
 		if s := info.PriceData.OtherRatios()["seconds"]; s > 0 {
 			logContent = fmt.Sprintf("%s，按%.0f秒计费", logContent, s)
@@ -31,16 +55,23 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 			logContent = fmt.Sprintf("%s，按次计费", logContent)
 		}
 	} else {
-		if otherRatios := info.PriceData.OtherRatios(); len(otherRatios) > 0 {
-			var contents []string
-			for key, ra := range otherRatios {
-				if 1.0 != ra {
-					contents = append(contents, fmt.Sprintf("%s: %.2f", key, ra))
-				}
+		// 自定义倍率参数单独以"参数名=参数值 ×倍率"展示，其余（如 seconds）保持原格式
+		customHits := make(map[string]bool, len(info.CustomRatioHits))
+		var customContents []string
+		for _, hit := range info.CustomRatioHits {
+			customHits[hit.Name] = true
+			customContents = append(customContents, fmt.Sprintf("%s=%s ×%s", hit.Name, customRatioHitValue(hit), strconv.FormatFloat(hit.Ratio, 'f', -1, 64)))
+		}
+		var contents []string
+		for key, ra := range info.PriceData.OtherRatios() {
+			if 1.0 != ra && !customHits[key] {
+				contents = append(contents, fmt.Sprintf("%s: %.2f", key, ra))
 			}
-			if len(contents) > 0 {
-				logContent = fmt.Sprintf("%s, 计算参数：%s", logContent, strings.Join(contents, ", "))
-			}
+		}
+		sort.Strings(contents)
+		contents = append(contents, customContents...)
+		if len(contents) > 0 {
+			logContent = fmt.Sprintf("%s, 计算参数：%s", logContent, strings.Join(contents, ", "))
 		}
 	}
 	other := make(map[string]interface{})
@@ -58,6 +89,19 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 		other["is_model_mapped"] = true
 		other["upstream_model_name"] = info.UpstreamModelName
 	}
+	if len(info.CustomRatioHits) > 0 {
+		other["custom_ratios"] = info.CustomRatioHits
+	}
+	if exprBilling := info.TaskExprBilling; exprBilling != nil {
+		taskExpr := map[string]interface{}{
+			"output_seconds": exprBilling.OutputSeconds,
+			"multipliers":    exprBilling.Multipliers,
+		}
+		if exprBilling.HasInputSeconds {
+			taskExpr["input_seconds"] = exprBilling.InputSeconds
+		}
+		other["task_expr"] = taskExpr
+	}
 	attachQuotaSaturation(c, info, other)
 	model.RecordConsumeLog(c, info.UserId, model.RecordConsumeLogParams{
 		ChannelId: info.ChannelId,
@@ -71,6 +115,19 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 	})
 	model.UpdateUserUsedQuotaAndRequestCount(info.UserId, info.PriceData.Quota)
 	model.UpdateChannelUsedQuota(info.ChannelId, info.PriceData.Quota)
+}
+
+// customRatioHitValue 把自定义倍率命中的参数值转成日志文案：
+// "*" → "*（2个）"，"*count" → "按个数（2个）"，精确值原样输出
+func customRatioHitValue(hit billingexpr.ParamMultiplier) string {
+	switch hit.Value {
+	case "*":
+		return fmt.Sprintf("*（%d个）", hit.Count)
+	case "*count":
+		return fmt.Sprintf("按个数（%d个）", hit.Count)
+	default:
+		return hit.Value
+	}
 }
 
 // ---------------------------------------------------------------------------

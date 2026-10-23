@@ -226,6 +226,24 @@ export interface LogOtherData {
   is_task?: boolean
   task_id?: string
   reason?: string
+  // Custom parameter multipliers hit by an async task (per-call / per-second)
+  custom_ratios?: Array<{
+    name: string
+    value?: string
+    count?: number
+    ratio: number
+  }>
+  // Async task expression billing breakdown (consume logs)
+  task_expr?: {
+    input_seconds?: number
+    output_seconds?: number
+    multipliers?: Array<{
+      name: string
+      value?: string
+      count?: number
+      ratio: number
+    }>
+  }
   // Subscription billing fields
   subscription_plan_id?: string
   subscription_plan_title?: string

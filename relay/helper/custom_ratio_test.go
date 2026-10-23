@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -104,6 +105,35 @@ func TestApplyCustomRatios(t *testing.T) {
 			assert.Equal(t, tt.expected, info.PriceData.OtherRatios())
 		})
 	}
+}
+
+func TestApplyCustomRatiosRecordsHitsForLog(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	body := `{"resolution":"720p","videos":["a.mp4","b.mp4"],"images":["x","y","z"],"audios":[]}`
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/video/generations", strings.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	info := &relaycommon.RelayInfo{}
+
+	ApplyCustomRatios(ctx, info, map[string]map[string]float64{
+		"resolution": {"720p": 1.75},
+		"videos":     {"*": 1.5},
+		"images":     {"*count": 2},
+		"audios":     {"*": 3},
+	})
+
+	// 按参数名排序；空数组不命中，不出现在日志里
+	assert.Equal(t, []billingexpr.ParamMultiplier{
+		{Name: "images", Value: "*count", Count: 3, Ratio: 6},
+		{Name: "resolution", Value: "720p", Ratio: 1.75},
+		{Name: "videos", Value: "*", Count: 2, Ratio: 1.5},
+	}, info.CustomRatioHits)
+
+	// 渠道重试再次调用时不会重复累积
+	ApplyCustomRatios(ctx, info, map[string]map[string]float64{"videos": {"*": 1.5}})
+	assert.Len(t, info.CustomRatioHits, 1)
 }
 
 func TestApplyCustomRatiosQueryAndBodyReuse(t *testing.T) {

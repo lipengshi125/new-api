@@ -309,6 +309,7 @@ export function evalExprLocally(
           : 0,
       // 预览没有真实请求上下文：请求参数/请求头视为未传，时间函数取本地当前时间
       param: () => null,
+      video_seconds: () => 0,
       header: () => '',
       has: (source: unknown, substr: string) =>
         source != null && !!substr && String(source).includes(substr),

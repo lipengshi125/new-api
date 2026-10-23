@@ -172,6 +172,12 @@ type RelayInfo struct {
 	// captured at pre-consume time. Non-nil only when billing mode is "tiered_expr".
 	TieredBillingSnapshot *billingexpr.BillingSnapshot
 	BillingRequestInput   *billingexpr.RequestInput
+	// TaskExprBilling 记录异步任务表达式计费的明细（输入/输出秒数、参数倍率），
+	// 仅用于消费日志展示。非 nil 表示该任务按表达式计费。
+	TaskExprBilling *TaskExprBilling
+	// CustomRatioHits 记录本次请求命中的自定义倍率参数（参数名、参数值、倍率），
+	// 仅用于消费日志展示，实际倍率已写入 PriceData.OtherRatios。
+	CustomRatioHits []billingexpr.ParamMultiplier
 
 	Request dto.Request
 
@@ -685,6 +691,16 @@ type TaskRelayInfo struct {
 	// a specific channel (e.g., remix on origin task's channel). Stored as any
 	// to avoid an import cycle with model; callers type-assert to *model.Channel.
 	LockedChannel any
+}
+
+// TaskExprBilling 异步任务表达式计费的展示明细
+type TaskExprBilling struct {
+	HasInputSeconds bool                          // 表达式是否使用了 video_seconds()
+	InputSeconds    float64                       // 参考视频总时长（探测得到）
+	OutputSeconds   float64                       // 请求的 duration/seconds 参数
+	Multipliers     []billingexpr.ParamMultiplier // 参数倍率
+	// MediaSeconds 是各 video_seconds(path) 的探测结果，渠道重试时复用，避免重复下载
+	MediaSeconds map[string]float64
 }
 
 type TaskSubmitReq struct {

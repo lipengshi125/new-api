@@ -5256,6 +5256,11 @@
     "Parameter name can only contain letters, numbers, underscores, hyphens and dots": "Parameter name can only contain letters, numbers, underscores, hyphens and dots",
     "Exact value: applies when the parameter equals the value. Any value: applies whenever the parameter is present and non-empty. Per item: multiplier × item count (array length; a non-empty single value counts as 1; capped at 128). Use dots for nested fields, e.g. input.images.": "Exact value: applies when the parameter equals the value. Any value: applies whenever the parameter is present and non-empty. Per item: multiplier × item count (array length; a non-empty single value counts as 1; capped at 128). Use dots for nested fields, e.g. input.images.",
     "When {{name}} is set": "When {{name}} is set",
-    "Per item in {{name}}": "Per item in {{name}}"
+    "Per item in {{name}}": "Per item in {{name}}",
+    "Input Seconds": "Input Seconds",
+    "Output Seconds": "Output Seconds",
+    "Billed Seconds": "Billed Seconds",
+    "Not provided": "Not provided",
+    "{{count}} items": "{{count}} items"
   }
 }

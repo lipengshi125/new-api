@@ -53,6 +53,7 @@ var compileEnvPrototypeV1 = map[string]interface{}{
 	"header":                 func(string) string { return "" },
 	"param":                  func(string) interface{} { return nil },
 	"has":                    func(interface{}, string) bool { return false },
+	"video_seconds":          func(string) float64 { return 0 },
 	"hour":                   func(string) int { return 0 },
 	"minute":                 func(string) int { return 0 },
 	"weekday":                func(string) int { return 0 },
@@ -137,6 +138,39 @@ func extractUsedVars(prog *vm.Program) map[string]bool {
 		return false
 	})
 	return vars
+}
+
+// VideoSecondsPaths returns the literal request paths passed to video_seconds()
+// in an expression, so callers know which media URLs to probe before evaluation.
+// Non-literal arguments are ignored (they would always evaluate to 0).
+func VideoSecondsPaths(exprStr string) ([]string, error) {
+	prog, err := CompileFromCache(exprStr)
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]bool)
+	var paths []string
+	ast.Find(prog.Node(), func(n ast.Node) bool {
+		call, ok := n.(*ast.CallNode)
+		if !ok || len(call.Arguments) != 1 {
+			return false
+		}
+		callee, ok := call.Callee.(*ast.IdentifierNode)
+		if !ok || callee.Value != "video_seconds" {
+			return false
+		}
+		arg, ok := call.Arguments[0].(*ast.StringNode)
+		if !ok {
+			return false
+		}
+		path := strings.TrimSpace(arg.Value)
+		if path != "" && !seen[path] {
+			seen[path] = true
+			paths = append(paths, path)
+		}
+		return false
+	})
+	return paths, nil
 }
 
 // UsedVars returns the set of identifier names referenced by an expression.

@@ -5256,6 +5256,11 @@
     "Parameter name can only contain letters, numbers, underscores, hyphens and dots": "Tên tham số chỉ được chứa chữ cái, số, dấu gạch dưới, dấu gạch ngang và dấu chấm",
     "Exact value: applies when the parameter equals the value. Any value: applies whenever the parameter is present and non-empty. Per item: multiplier × item count (array length; a non-empty single value counts as 1; capped at 128). Use dots for nested fields, e.g. input.images.": "Giá trị chính xác: áp dụng khi tham số bằng giá trị. Giá trị bất kỳ: áp dụng khi tham số tồn tại và không rỗng. Theo mục: hệ số × số lượng mục (độ dài mảng; một giá trị đơn không rỗng tính là 1; tối đa 128). Dùng dấu chấm cho trường lồng nhau, ví dụ input.images.",
     "When {{name}} is set": "Khi {{name}} được đặt",
-    "Per item in {{name}}": "Mỗi mục trong {{name}}"
+    "Per item in {{name}}": "Mỗi mục trong {{name}}",
+    "Input Seconds": "Số giây đầu vào",
+    "Output Seconds": "Số giây đầu ra",
+    "Billed Seconds": "Số giây tính phí",
+    "Not provided": "Không cung cấp",
+    "{{count}} items": "{{count}} mục"
   }
 }

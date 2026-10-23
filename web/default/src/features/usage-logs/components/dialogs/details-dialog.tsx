@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -31,7 +32,6 @@ import {
   Info,
   LogIn,
 } from 'lucide-react'
-import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 
 import { Dialog } from '@/components/dialog'
@@ -179,7 +179,9 @@ function getUsageBillingPathLabel(
   }
 }
 
-function isUsageBillingPathLocal(adminInfo: LogOtherData['admin_info']): boolean {
+function isUsageBillingPathLocal(
+  adminInfo: LogOtherData['admin_info']
+): boolean {
   if (adminInfo?.usage_billing_path) {
     return adminInfo.usage_billing_path === USAGE_BILLING_PATH.LOCAL
   }
@@ -212,7 +214,30 @@ function BillingBreakdown(props: {
   const fmtPrice = (usd: number) => formatBillingCurrencyFromUSD(usd, priceOpts)
   const baseInputUSD = other.model_ratio != null ? other.model_ratio * 2.0 : 0
 
-  if (isTieredExpr) {
+  const taskExpr = other.task_expr
+  if (taskExpr) {
+    // 任务表达式计费：秒数 → 参数倍率 → 分组倍率 → 总费用
+    rows.push({ label: t('Billing Mode'), value: t('Dynamic Pricing') })
+    const outputSeconds = taskExpr.output_seconds ?? 0
+    if (taskExpr.input_seconds != null) {
+      rows.push({
+        label: t('Input Seconds'),
+        value: `${taskExpr.input_seconds}s`,
+      })
+    }
+    rows.push({ label: t('Output Seconds'), value: `${outputSeconds}s` })
+    if (taskExpr.input_seconds != null) {
+      rows.push({
+        label: t('Billed Seconds'),
+        value: `${taskExpr.input_seconds}s + ${outputSeconds}s = ${Number((taskExpr.input_seconds + outputSeconds).toFixed(2))}s`,
+      })
+    }
+    for (const m of taskExpr.multipliers ?? []) {
+      let value = m.value || t('Not provided')
+      if (m.count) value = t('{{count}} items', { count: m.count })
+      rows.push({ label: m.name, value: `${value} ×${m.ratio}` })
+    }
+  } else if (isTieredExpr) {
     rows.push({
       label: t('Billing Mode'),
       value: t('Dynamic Pricing'),
@@ -258,6 +283,17 @@ function BillingBreakdown(props: {
         value: `${fmtPrice(baseInputUSD * other.completion_ratio)}/M`,
       })
     }
+  }
+
+  // 自定义倍率参数：参数名 | 参数值 ×倍率（任意值/按个数附带元素个数）
+  for (const hit of other.custom_ratios ?? []) {
+    let value = hit.value ?? ''
+    if (hit.value === '*') {
+      value = `* (${t('{{count}} items', { count: hit.count ?? 0 })})`
+    } else if (hit.value === '*count') {
+      value = `${t('Per item')} (${t('{{count}} items', { count: hit.count ?? 0 })})`
+    }
+    rows.push({ label: hit.name, value: `${value} ×${hit.ratio}` })
   }
 
   const userGR = other.user_group_ratio
