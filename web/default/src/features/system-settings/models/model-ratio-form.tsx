@@ -61,6 +61,7 @@ type ModelFormValues = {
   BillingExpr: string
   ModelPriceUnit: string
   CustomRatios: string
+  CustomRatioNotes: string
 }
 
 type ModelRatioFormProps = {
@@ -275,6 +276,7 @@ export const ModelRatioForm = memo(function ModelRatioForm({
               savedBillingMode={savedValues.BillingMode}
               savedBillingExpr={savedValues.BillingExpr}
               savedCustomRatios={savedValues.CustomRatios}
+              savedCustomRatioNotes={savedValues.CustomRatioNotes}
               modelPrice={form.watch('ModelPrice')}
               modelRatio={form.watch('ModelRatio')}
               cacheRatio={form.watch('CacheRatio')}
@@ -286,6 +288,7 @@ export const ModelRatioForm = memo(function ModelRatioForm({
               billingMode={form.watch('BillingMode')}
               billingExpr={form.watch('BillingExpr')}
               customRatios={form.watch('CustomRatios')}
+              customRatioNotes={form.watch('CustomRatioNotes')}
               savedModelPriceUnit={savedValues.ModelPriceUnit}
               modelPriceUnit={form.watch('ModelPriceUnit')}
               candidateModelNames={

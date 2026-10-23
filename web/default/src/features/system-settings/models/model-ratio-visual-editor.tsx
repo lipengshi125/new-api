@@ -52,6 +52,7 @@ import { useMediaQuery } from '@/hooks'
 
 import { safeJsonParse } from '../utils/json-parser'
 import type { PricingMode } from './model-pricing-core'
+import { inferBillingUnit, type BillingUnit } from './model-pricing-core'
 import {
   ModelPricingEditorPanel,
   type ModelPricingEditorPanelHandle,
@@ -65,7 +66,6 @@ import {
   type ModelRow,
 } from './model-pricing-snapshots'
 import { buildModelRatioColumns } from './model-ratio-table-columns'
-import { inferBillingUnit, type BillingUnit } from './model-pricing-core'
 
 type ModelRatioVisualEditorProps = {
   savedModelPrice: string
@@ -79,6 +79,7 @@ type ModelRatioVisualEditorProps = {
   savedBillingMode: string
   savedBillingExpr: string
   savedCustomRatios: string
+  savedCustomRatioNotes: string
   modelPrice: string
   modelRatio: string
   cacheRatio: string
@@ -90,6 +91,7 @@ type ModelRatioVisualEditorProps = {
   billingMode: string
   billingExpr: string
   customRatios: string
+  customRatioNotes: string
   savedModelPriceUnit: string
   modelPriceUnit: string
   candidateModelNames?: string[]
@@ -122,6 +124,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
     savedBillingMode,
     savedBillingExpr,
     savedCustomRatios,
+    savedCustomRatioNotes,
     modelPrice,
     modelRatio,
     cacheRatio,
@@ -133,6 +136,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
     billingMode,
     billingExpr,
     customRatios,
+    customRatioNotes,
     savedModelPriceUnit,
     modelPriceUnit,
     candidateModelNames,
@@ -210,6 +214,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       billingMode: savedBillingMode,
       billingExpr: savedBillingExpr,
       customRatios: savedCustomRatios,
+      customRatioNotes: savedCustomRatioNotes,
     })
     const draftRows = buildModelSnapshots({
       modelPrice,
@@ -223,6 +228,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       billingMode,
       billingExpr,
       customRatios,
+      customRatioNotes,
     })
 
     const savedByName = new Map(savedRows.map((row) => [row.name, row]))
@@ -268,6 +274,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
     savedBillingMode,
     savedBillingExpr,
     savedCustomRatios,
+    savedCustomRatioNotes,
     modelPrice,
     modelRatio,
     cacheRatio,
@@ -279,6 +286,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
     billingMode,
     billingExpr,
     customRatios,
+    customRatioNotes,
   ])
 
   const modeCounts = useMemo(
@@ -335,6 +343,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
         requestRuleExpr: editableModel.requestRuleExpr,
         billingUnit,
         customRatios: editableModel.customRatios,
+        customRatioNotes: editableModel.customRatioNotes,
       })
       setEditorOpen(true)
       if (isMobile) setSheetOpen(true)
@@ -412,6 +421,9 @@ const ModelRatioVisualEditorComponent = forwardRef<
       const customRatiosMap = safeJsonParse<
         Record<string, Record<string, Record<string, number>>>
       >(customRatios, { fallback: {}, silent: true })
+      const customRatioNotesMap = safeJsonParse<
+        Record<string, Record<string, Record<string, string>>>
+      >(customRatioNotes, { fallback: {}, silent: true })
 
       delete priceMap[name]
       delete ratioMap[name]
@@ -425,6 +437,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       delete billingExprMap[name]
       delete priceUnitMap[name]
       delete customRatiosMap[name]
+      delete customRatioNotesMap[name]
 
       onChange('ModelPrice', JSON.stringify(priceMap, null, 2))
       onChange('ModelRatio', JSON.stringify(ratioMap, null, 2))
@@ -447,6 +460,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       )
       onChange('ModelPriceUnit', JSON.stringify(priceUnitMap, null, 2))
       onChange('CustomRatios', JSON.stringify(customRatiosMap, null, 2))
+      onChange('CustomRatioNotes', JSON.stringify(customRatioNotesMap, null, 2))
 
       if (editData?.name === name) {
         setEditData(null)
@@ -467,6 +481,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       billingExpr,
       modelPriceUnit,
       customRatios,
+      customRatioNotes,
       onChange,
       editData,
     ]
@@ -565,6 +580,9 @@ const ModelRatioVisualEditorComponent = forwardRef<
       const customRatiosMap = safeJsonParse<
         Record<string, Record<string, Record<string, number>>>
       >(customRatios, { fallback: {}, silent: true })
+      const customRatioNotesMap = safeJsonParse<
+        Record<string, Record<string, Record<string, string>>>
+      >(customRatioNotes, { fallback: {}, silent: true })
 
       const setIfPresent = (
         target: Record<string, number>,
@@ -589,9 +607,16 @@ const ModelRatioVisualEditorComponent = forwardRef<
         delete billingExprMap[name]
         delete priceUnitMap[name]
         delete customRatiosMap[name]
+        delete customRatioNotesMap[name]
 
         if (data.customRatios && Object.keys(data.customRatios).length > 0) {
           customRatiosMap[name] = data.customRatios
+        }
+        if (
+          data.customRatioNotes &&
+          Object.keys(data.customRatioNotes).length > 0
+        ) {
+          customRatioNotesMap[name] = data.customRatioNotes
         }
 
         if (data.billingMode === 'tiered_expr') {
@@ -653,6 +678,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       )
       onChange('ModelPriceUnit', JSON.stringify(priceUnitMap, null, 2))
       onChange('CustomRatios', JSON.stringify(customRatiosMap, null, 2))
+      onChange('CustomRatioNotes', JSON.stringify(customRatioNotesMap, null, 2))
     },
     [
       modelPrice,
@@ -667,6 +693,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       billingExpr,
       modelPriceUnit,
       customRatios,
+      customRatioNotes,
       onChange,
     ]
   )
@@ -901,6 +928,7 @@ export const ModelRatioVisualEditor = memo(
       prevProps.savedBillingMode === nextProps.savedBillingMode &&
       prevProps.savedBillingExpr === nextProps.savedBillingExpr &&
       prevProps.savedCustomRatios === nextProps.savedCustomRatios &&
+      prevProps.savedCustomRatioNotes === nextProps.savedCustomRatioNotes &&
       prevProps.modelPrice === nextProps.modelPrice &&
       prevProps.modelRatio === nextProps.modelRatio &&
       prevProps.cacheRatio === nextProps.cacheRatio &&
@@ -912,6 +940,7 @@ export const ModelRatioVisualEditor = memo(
       prevProps.billingMode === nextProps.billingMode &&
       prevProps.billingExpr === nextProps.billingExpr &&
       prevProps.customRatios === nextProps.customRatios &&
+      prevProps.customRatioNotes === nextProps.customRatioNotes &&
       prevProps.candidateModelNames === nextProps.candidateModelNames &&
       prevProps.candidateModelsLoading === nextProps.candidateModelsLoading &&
       prevProps.filterMode === nextProps.filterMode &&

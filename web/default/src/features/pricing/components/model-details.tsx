@@ -1122,64 +1122,77 @@ function GroupPricingSection(props: {
 
 function CustomRatiosSection(props: {
   customRatios: Record<string, Record<string, number>>
+  notes?: Record<string, Record<string, string>>
 }) {
   const { t } = useTranslation()
 
-  const flatRows = useMemo(() => {
-    const rows: Array<{
-      paramName: string
-      paramValue: string
-      ratio: number
-    }> = []
-    Object.entries(props.customRatios).forEach(([paramName, valueMap]) => {
-      Object.entries(valueMap).forEach(([paramValue, ratio]) => {
-        rows.push({ paramName, paramValue, ratio })
-      })
-    })
-    return rows
-  }, [props.customRatios])
+  // 按参数名分组：组头一行（参数名 | 倍率 | 备注），其下每个参数值一行
+  const groups = useMemo(
+    () =>
+      Object.entries(props.customRatios)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([paramName, valueMap]) => ({
+          paramName,
+          rows: Object.entries(valueMap)
+            .sort(([a], [b]) =>
+              a.localeCompare(b, undefined, { numeric: true })
+            )
+            .map(([paramValue, ratio]) => ({
+              paramValue,
+              ratio,
+              note: props.notes?.[paramName]?.[paramValue] ?? '',
+            })),
+        }))
+        .filter((group) => group.rows.length > 0),
+    [props.customRatios, props.notes]
+  )
 
-  if (flatRows.length === 0) return null
-
-  // 保留参数值（见 relay/helper/custom_ratio.go）显示为可读文案
-  const reservedValueLabels: Record<string, string> = {
-    '*': t('Any value'),
-    '*count': t('Per item'),
-  }
+  if (groups.length === 0) return null
 
   return (
     <section>
       <SectionTitle>{t('Parameter Multipliers')}</SectionTitle>
       <div className='bg-muted/20 overflow-hidden rounded-lg border'>
-        <table className='w-full text-sm'>
-          <thead className='bg-muted/30 border-b'>
-            <tr>
-              <th className='text-muted-foreground px-3 py-2 text-left text-xs font-medium'>
-                {t('Parameter Name')}
-              </th>
-              <th className='text-muted-foreground px-3 py-2 text-left text-xs font-medium'>
-                {t('Parameter Value')}
-              </th>
-              <th className='text-muted-foreground px-3 py-2 text-right text-xs font-medium'>
-                {t('Multiplier')}
-              </th>
-            </tr>
-          </thead>
-          <tbody className='divide-y'>
-            {flatRows.map((row, idx) => (
-              <tr key={idx} className='hover:bg-muted/20 transition-colors'>
-                <td className='text-foreground px-3 py-2.5 font-medium'>
-                  {row.paramName}
-                </td>
-                <td className='text-muted-foreground px-3 py-2.5'>
-                  {reservedValueLabels[row.paramValue] ?? row.paramValue}
-                </td>
-                <td className='text-foreground px-3 py-2.5 text-right font-mono font-semibold'>
-                  ×{row.ratio}
-                </td>
+        <table className='w-full table-fixed text-sm'>
+          <colgroup>
+            <col className='w-[30%]' />
+            <col className='w-[18%]' />
+            <col />
+          </colgroup>
+          {groups.map((group) => (
+            <tbody key={group.paramName} className='border-b last:border-b-0'>
+              <tr className='bg-muted/40'>
+                <th
+                  scope='rowgroup'
+                  className='text-foreground px-3 py-2 text-left font-mono text-xs font-semibold break-all'
+                >
+                  {group.paramName}
+                </th>
+                <th className='text-muted-foreground px-3 py-2 text-left text-xs font-medium'>
+                  {t('Multiplier')}
+                </th>
+                <th className='text-muted-foreground px-3 py-2 text-left text-xs font-medium'>
+                  {t('Note')}
+                </th>
               </tr>
-            ))}
-          </tbody>
+              {group.rows.map((row) => (
+                <tr
+                  key={row.paramValue}
+                  className='hover:bg-muted/20 border-t transition-colors'
+                >
+                  <td className='text-muted-foreground px-3 py-2.5 font-mono break-all'>
+                    {row.paramValue}
+                  </td>
+                  <td className='text-foreground px-3 py-2.5 font-mono font-semibold'>
+                    ×{row.ratio}
+                  </td>
+                  <td className='text-muted-foreground px-3 py-2.5 wrap-break-word'>
+                    {row.note || '-'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          ))}
         </table>
       </div>
     </section>
@@ -1267,7 +1280,10 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
             />
             {props.model.custom_ratios &&
               Object.keys(props.model.custom_ratios).length > 0 && (
-                <CustomRatiosSection customRatios={props.model.custom_ratios} />
+                <CustomRatiosSection
+                  customRatios={props.model.custom_ratios}
+                  notes={props.model.custom_ratio_notes}
+                />
               )}
           </section>
 

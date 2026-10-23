@@ -33,6 +33,7 @@ type Pricing struct {
 	AudioRatio             *float64                      `json:"audio_ratio,omitempty"`
 	AudioCompletionRatio   *float64                      `json:"audio_completion_ratio,omitempty"`
 	CustomRatios           map[string]map[string]float64 `json:"custom_ratios,omitempty"`
+	CustomRatioNotes       map[string]map[string]string  `json:"custom_ratio_notes,omitempty"`
 	EnableGroup            []string                      `json:"enable_groups"`
 	SupportedEndpointTypes []constant.EndpointType       `json:"supported_endpoint_types"`
 	BillingMode            string                        `json:"billing_mode,omitempty"`
@@ -430,6 +431,7 @@ func updatePricing() {
 		pricing.BillingUnit = ratio_setting.GetBillingUnit(model)
 		if customRatios := ratio_setting.GetCustomRatios(model); customRatios != nil {
 			pricing.CustomRatios = customRatios
+			pricing.CustomRatioNotes = ratio_setting.GetCustomRatioNotes(model)
 		}
 		pricingMap = append(pricingMap, pricing)
 	}

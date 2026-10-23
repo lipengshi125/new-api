@@ -5261,6 +5261,10 @@
     "Output Seconds": "輸出秒數",
     "Billed Seconds": "計費秒數",
     "Not provided": "未傳",
-    "{{count}} items": "{{count}} 個"
+    "{{count}} items": "{{count}} 個",
+    "Add value": "新增參數值",
+    "Delete parameter": "刪除參數",
+    "Note (shown in model marketplace)": "備註（會顯示在模型廣場）",
+    "This parameter name is already used by another group": "該參數名已被其他參數組使用"
   }
 }

@@ -44,10 +44,24 @@ import {
 
 type CustomRatiosTableProps = {
   value: Record<string, Record<string, number>>
-  onChange: (value: Record<string, Record<string, number>>) => void
+  notes?: Record<string, Record<string, string>>
+  onChange: (
+    ratios: Record<string, Record<string, number>>,
+    notes: Record<string, Record<string, string>>
+  ) => void
 }
 
-export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
+// groupId 标识同一参数名下的一组行，与参数名解耦，
+// 这样新建的多个空参数组不会被合并，重命名参数时组也保持稳定。
+type EditorRow = FlatRatioRow & { groupId: string }
+
+const GRID_COLS = 'grid grid-cols-[minmax(0,1.3fr)_110px_minmax(0,2fr)_36px]'
+
+export function CustomRatiosTable({
+  value,
+  notes,
+  onChange,
+}: CustomRatiosTableProps) {
   const { t } = useTranslation()
   const matchModeOptions: Array<{
     value: CustomRatioMatchMode
@@ -61,136 +75,121 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
   // 避免编辑时因 id 变化触发 <Input> 卸载重挂而丢失焦点。
   // 切换模型时通过调用处的 key={editorReloadToken} 重新挂载来重新播种。
   const idRef = useRef(0)
-  const [rows, setRows] = useState<FlatRatioRow[]>(() =>
-    flattenCustomRatios(value).map((row) => ({
+  const [rows, setRows] = useState<EditorRow[]>(() =>
+    flattenCustomRatios(value, notes).map((row) => ({
       ...row,
       id: `row-${idRef.current++}`,
+      groupId: `group-${row.paramName}`,
     }))
   )
 
   const handleRowsChange = useCallback(
-    (newRows: FlatRatioRow[]) => {
+    (newRows: EditorRow[]) => {
       setRows(newRows)
-      onChange(unflattenCustomRatios(newRows))
+      const next = unflattenCustomRatios(newRows)
+      onChange(next.ratios, next.notes)
     },
     [onChange]
   )
 
-  // 判断当前行是否是该参数名的第一行
-  const isFirstRowOfParam = (index: number): boolean => {
-    if (index === 0) return true
-    return rows[index].paramName !== rows[index - 1].paramName
-  }
-
-  // 获取相同参数名的行背景色
-  const getRowBackground = (paramName: string): string => {
-    // 找到该参数名首次出现的位置
-    const firstIndex = rows.findIndex((r) => r.paramName === paramName)
-    // 偶数组用浅色背景，奇数组用默认背景
-    const groupIndex = rows
-      .slice(0, firstIndex + 1)
-      .filter((_, i) => isFirstRowOfParam(i)).length
-    return groupIndex % 2 === 0 ? 'bg-muted/30' : ''
-  }
-
-  const handleAddRow = useCallback(() => {
-    const newRow: FlatRatioRow = {
-      id: `row-${idRef.current++}`,
-      paramName: '',
-      paramValue: '',
-      ratio: 1.0,
+  // 按 groupId 首次出现的顺序分组
+  const groups: Array<{
+    groupId: string
+    paramName: string
+    rows: EditorRow[]
+  }> = []
+  for (const row of rows) {
+    let group = groups.find((g) => g.groupId === row.groupId)
+    if (!group) {
+      group = { groupId: row.groupId, paramName: row.paramName, rows: [] }
+      groups.push(group)
     }
-    handleRowsChange([...rows, newRow])
-  }, [rows, handleRowsChange])
+    group.rows.push(row)
+  }
 
-  const handleDeleteRow = useCallback(
-    (id: string) => {
-      handleRowsChange(rows.filter((row) => row.id !== id))
-    },
-    [rows, handleRowsChange]
-  )
+  const newRow = (groupId: string, paramName: string): EditorRow => ({
+    id: `row-${idRef.current++}`,
+    groupId,
+    paramName,
+    paramValue: '',
+    ratio: 1.0,
+    note: '',
+  })
 
-  const handleFieldChange = useCallback(
-    (id: string, field: keyof FlatRatioRow, value: string | number) => {
-      const newRows = rows.map((row) =>
-        row.id === id ? { ...row, [field]: value } : row
-      )
-      handleRowsChange(newRows)
-    },
-    [rows, handleRowsChange]
-  )
+  const handleAddGroup = () => {
+    handleRowsChange([...rows, newRow(`new-${idRef.current}`, '')])
+  }
+
+  const handleAddValue = (groupId: string, paramName: string) => {
+    // 新行插在该组末尾，保持同组行连续
+    const lastIndex = rows.findLastIndex((row) => row.groupId === groupId)
+    const next = [...rows]
+    next.splice(lastIndex + 1, 0, newRow(groupId, paramName))
+    handleRowsChange(next)
+  }
+
+  const handleRenameGroup = (groupId: string, paramName: string) => {
+    handleRowsChange(
+      rows.map((row) => (row.groupId === groupId ? { ...row, paramName } : row))
+    )
+  }
+
+  const handleDeleteGroup = (groupId: string) => {
+    handleRowsChange(rows.filter((row) => row.groupId !== groupId))
+  }
+
+  const handleDeleteRow = (id: string) => {
+    handleRowsChange(rows.filter((row) => row.id !== id))
+  }
+
+  const handleFieldChange = (
+    id: string,
+    field: 'paramValue' | 'ratio' | 'note',
+    fieldValue: string | number
+  ) => {
+    handleRowsChange(
+      rows.map((row) => (row.id === id ? { ...row, [field]: fieldValue } : row))
+    )
+  }
 
   // 切换匹配方式：任意值/按个数使用保留参数值，切回精确值时清空让用户重新填写
-  const handleMatchModeChange = useCallback(
-    (id: string, mode: CustomRatioMatchMode) => {
-      let paramValue = ''
-      if (mode === 'any') paramValue = CUSTOM_RATIO_MATCH_ANY
-      if (mode === 'per_item') paramValue = CUSTOM_RATIO_MATCH_PER_ITEM
-      handleRowsChange(
-        rows.map((row) => (row.id === id ? { ...row, paramValue } : row))
+  const handleMatchModeChange = (id: string, mode: CustomRatioMatchMode) => {
+    let paramValue = ''
+    if (mode === 'any') paramValue = CUSTOM_RATIO_MATCH_ANY
+    if (mode === 'per_item') paramValue = CUSTOM_RATIO_MATCH_PER_ITEM
+    handleFieldChange(id, 'paramValue', paramValue)
+  }
+
+  // 参数名允许点号以访问嵌套字段，如 input.images
+  const paramNameError = (name: string): string | null => {
+    if (!name.trim()) return t('Parameter name is required')
+    if (!/^[a-zA-Z0-9_.-]+$/.test(name)) {
+      return t(
+        'Parameter name can only contain letters, numbers, underscores, hyphens and dots'
       )
-    },
-    [rows, handleRowsChange]
-  )
+    }
+    if (groups.filter((g) => g.paramName === name).length > 1) {
+      return t('This parameter name is already used by another group')
+    }
+    return null
+  }
 
-  // 验证参数名格式（允许点号以访问嵌套字段，如 input.images）
-  const validateParamName = useCallback(
-    (name: string): string | null => {
-      if (!name.trim()) return t('Parameter name is required')
-      if (!/^[a-zA-Z0-9_.-]+$/.test(name)) {
-        return t(
-          'Parameter name can only contain letters, numbers, underscores, hyphens and dots'
-        )
-      }
-      return null
-    },
-    [t]
-  )
-
-  // 验证参数值
-  const validateParamValue = useCallback(
-    (value: string): string | null => {
-      if (!value.trim()) return t('Parameter value is required')
-      if (value.length > 100) return t('Parameter value is too long')
-      return null
-    },
-    [t]
-  )
-
-  // 验证倍率
-  const validateRatio = useCallback(
-    (ratio: number): string | null => {
-      if (ratio <= 0) return t('Multiplier must be greater than 0')
-      return null
-    },
-    [t]
-  )
-
-  // 检查重复的参数名+参数值组合
-  const checkDuplicate = useCallback(
-    (paramName: string, paramValue: string, currentId: string): boolean => {
-      return rows.some(
-        (row) =>
-          row.id !== currentId &&
-          row.paramName === paramName &&
-          row.paramValue === paramValue
-      )
-    },
-    [rows]
-  )
-
-  // 获取每行的验证错误
-  const getRowErrors = useCallback(
-    (row: FlatRatioRow) => {
-      return {
-        paramName: validateParamName(row.paramName),
-        paramValue: validateParamValue(row.paramValue),
-        ratio: validateRatio(row.ratio),
-        duplicate: checkDuplicate(row.paramName, row.paramValue, row.id),
-      }
-    },
-    [validateParamName, validateParamValue, validateRatio, checkDuplicate]
-  )
+  const rowErrors = (row: EditorRow) => {
+    const errors: string[] = []
+    if (!row.paramValue.trim()) {
+      errors.push(t('Parameter value is required'))
+    } else if (row.paramValue.length > 100) {
+      errors.push(t('Parameter value is too long'))
+    }
+    if (!(row.ratio > 0)) errors.push(t('Multiplier must be greater than 0'))
+    const duplicate = rows.some(
+      (other) =>
+        other.id !== row.id &&
+        other.groupId === row.groupId &&
+        other.paramValue === row.paramValue
+    )
+    return { errors, duplicate }
+  }
 
   return (
     <div className='space-y-4'>
@@ -210,219 +209,215 @@ export function CustomRatiosTable({ value, onChange }: CustomRatiosTableProps) {
         </p>
       </div>
 
-      {/* 工具栏 */}
       <div className='flex justify-end'>
         <Button
           type='button'
           variant='outline'
           size='sm'
-          onClick={handleAddRow}
+          onClick={handleAddGroup}
         >
           <Plus className='mr-2 size-4' />
           {t('Add Parameter')}
         </Button>
       </div>
 
-      <div className='rounded-lg border'>
-        {/* 表格头 */}
-        <div className='bg-muted/50 grid grid-cols-[1fr_130px_1fr_120px_60px] gap-4 border-b px-4 py-2 text-xs font-semibold'>
-          <div>{t('Parameter Name')}</div>
-          <div>{t('Match')}</div>
-          <div>{t('Parameter Value')}</div>
-          <div>{t('Multiplier')}</div>
-          <div>{t('Actions')}</div>
+      {groups.length === 0 ? (
+        <div className='text-muted-foreground rounded-lg border px-4 py-8 text-center text-sm'>
+          {t('No custom parameter multipliers configured')}
         </div>
-
-        {/* 表格体 */}
-        {rows.length === 0 ? (
-          <div className='text-muted-foreground px-4 py-8 text-center text-sm'>
-            {t('No custom parameter multipliers configured')}
-          </div>
-        ) : (
-          <div className='divide-y'>
-            {rows.map((row, index) => {
-              const matchMode = getCustomRatioMatchMode(row.paramValue)
-              return (
-                <div key={row.id}>
-                  <div
+      ) : (
+        <div className='space-y-3'>
+          {groups.map((group) => {
+            const nameError = paramNameError(group.paramName)
+            return (
+              <div
+                key={group.groupId}
+                className='overflow-hidden rounded-lg border'
+              >
+                {/* 组头：参数名 | 倍率 | 备注 */}
+                <div
+                  className={cn(
+                    GRID_COLS,
+                    'bg-muted/50 items-center gap-3 border-b px-3 py-2 text-xs font-semibold'
+                  )}
+                >
+                  <Input
+                    value={group.paramName}
+                    onChange={(e) =>
+                      handleRenameGroup(group.groupId, e.target.value)
+                    }
+                    placeholder={t('Parameter Name')}
+                    aria-label={t('Parameter Name')}
                     className={cn(
-                      'grid grid-cols-[1fr_130px_1fr_120px_60px] gap-4 px-4 py-2',
-                      getRowBackground(row.paramName)
+                      'h-8 font-mono font-semibold',
+                      nameError && 'border-red-500'
                     )}
+                  />
+                  <div>{t('Multiplier')}</div>
+                  <div>{t('Note')}</div>
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='sm'
+                    className='size-8 p-0'
+                    onClick={() => handleDeleteGroup(group.groupId)}
+                    title={t('Delete parameter')}
+                    aria-label={t('Delete parameter')}
                   >
-                    {/* 参数名列 */}
-                    <div className='flex items-center'>
-                      {isFirstRowOfParam(index) ? (
-                        <Input
-                          value={row.paramName}
-                          onChange={(e) =>
-                            handleFieldChange(
-                              row.id,
-                              'paramName',
-                              e.target.value
-                            )
-                          }
-                          placeholder={t('Parameter Name')}
-                          className={cn(
-                            'h-8',
-                            getRowErrors(row).paramName && 'border-red-500'
-                          )}
-                        />
-                      ) : (
-                        <div className='flex items-center gap-2'>
-                          <span className='text-muted-foreground'>↳</span>
+                    <Trash2 className='size-4' />
+                  </Button>
+                </div>
+                {nameError && (
+                  <div className='px-3 pt-1 text-xs text-red-500'>
+                    {nameError}
+                  </div>
+                )}
+
+                {/* 参数值行：参数值 | 倍率 | 备注 */}
+                <div className='divide-y'>
+                  {group.rows.map((row) => {
+                    const matchMode = getCustomRatioMatchMode(row.paramValue)
+                    const { errors, duplicate } = rowErrors(row)
+                    return (
+                      <div key={row.id} className='px-3 py-2'>
+                        <div className={cn(GRID_COLS, 'items-center gap-3')}>
+                          <div className='flex min-w-0 items-center gap-2'>
+                            <Select
+                              items={matchModeOptions}
+                              value={matchMode}
+                              onValueChange={(v) =>
+                                v !== null && handleMatchModeChange(row.id, v)
+                              }
+                            >
+                              <SelectTrigger
+                                className='h-8 w-24 shrink-0'
+                                aria-label={t('Match')}
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent alignItemWithTrigger={false}>
+                                <SelectGroup>
+                                  {matchModeOptions.map((option) => (
+                                    <SelectItem
+                                      key={option.value}
+                                      value={option.value}
+                                    >
+                                      {option.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </SelectContent>
+                            </Select>
+                            {matchMode === 'exact' ? (
+                              <Input
+                                value={row.paramValue}
+                                onChange={(e) =>
+                                  handleFieldChange(
+                                    row.id,
+                                    'paramValue',
+                                    e.target.value
+                                  )
+                                }
+                                placeholder={t('Parameter Value')}
+                                aria-label={t('Parameter Value')}
+                                className={cn(
+                                  'h-8 min-w-0 font-mono',
+                                  errors.length > 0 &&
+                                    !row.paramValue.trim() &&
+                                    'border-red-500'
+                                )}
+                              />
+                            ) : (
+                              <span className='font-mono text-sm'>
+                                {row.paramValue}
+                              </span>
+                            )}
+                          </div>
                           <Input
-                            value={row.paramName}
+                            type='number'
+                            step='0.01'
+                            min='0.01'
+                            value={row.ratio}
                             onChange={(e) =>
                               handleFieldChange(
                                 row.id,
-                                'paramName',
-                                e.target.value
+                                'ratio',
+                                Number.parseFloat(e.target.value) || 0
                               )
                             }
-                            placeholder={t('Parameter Name')}
+                            placeholder='1.0'
+                            aria-label={t('Multiplier')}
                             className={cn(
                               'h-8',
-                              getRowErrors(row).paramName && 'border-red-500'
+                              !(row.ratio > 0) && 'border-red-500'
                             )}
                           />
+                          <Input
+                            value={row.note}
+                            onChange={(e) =>
+                              handleFieldChange(row.id, 'note', e.target.value)
+                            }
+                            maxLength={200}
+                            placeholder={t('Note (shown in model marketplace)')}
+                            aria-label={t('Note')}
+                            className='h-8'
+                          />
+                          <Button
+                            type='button'
+                            variant='ghost'
+                            size='sm'
+                            className='size-8 p-0'
+                            onClick={() => handleDeleteRow(row.id)}
+                            title={t('Delete')}
+                            aria-label={t('Delete')}
+                          >
+                            {duplicate ? (
+                              <AlertTriangle className='size-4 text-amber-500' />
+                            ) : (
+                              <Trash2 className='size-4' />
+                            )}
+                          </Button>
                         </div>
-                      )}
-                    </div>
-
-                    {/* 匹配方式列 */}
-                    <div className='flex items-center'>
-                      <Select
-                        items={matchModeOptions}
-                        value={matchMode}
-                        onValueChange={(v) =>
-                          v !== null && handleMatchModeChange(row.id, v)
-                        }
-                      >
-                        <SelectTrigger
-                          className='h-8 w-full'
-                          aria-label={t('Match')}
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent alignItemWithTrigger={false}>
-                          <SelectGroup>
-                            {matchModeOptions.map((option) => (
-                              <SelectItem
-                                key={option.value}
-                                value={option.value}
-                              >
-                                {option.label}
-                              </SelectItem>
+                        {(errors.length > 0 || duplicate) && (
+                          <div className='pt-1 text-xs'>
+                            {errors.map((message) => (
+                              <div key={message} className='text-red-500'>
+                                {message}
+                              </div>
                             ))}
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* 参数值列：任意值/按个数模式无需填写参数值 */}
-                    <div className='flex items-center'>
-                      {matchMode === 'exact' ? (
-                        <Input
-                          value={row.paramValue}
-                          onChange={(e) =>
-                            handleFieldChange(
-                              row.id,
-                              'paramValue',
-                              e.target.value
-                            )
-                          }
-                          placeholder={t('Parameter Value')}
-                          className={cn(
-                            'h-8',
-                            getRowErrors(row).paramValue && 'border-red-500'
-                          )}
-                        />
-                      ) : (
-                        <span className='text-muted-foreground text-xs'>
-                          {matchMode === 'any'
-                            ? t('Applies to any non-empty value')
-                            : t('Multiplier × item count')}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* 倍率列 */}
-                    <div className='flex items-center'>
-                      <Input
-                        type='number'
-                        step='0.01'
-                        min='0.01'
-                        value={row.ratio}
-                        onChange={(e) =>
-                          handleFieldChange(
-                            row.id,
-                            'ratio',
-                            parseFloat(e.target.value) || 0
-                          )
-                        }
-                        placeholder='1.0'
-                        className={cn(
-                          'h-8',
-                          getRowErrors(row).ratio && 'border-red-500'
+                            {duplicate && (
+                              <div className='text-amber-600'>
+                                {t(
+                                  'This parameter value already exists and will override the previous configuration'
+                                )}
+                              </div>
+                            )}
+                          </div>
                         )}
-                      />
-                    </div>
-
-                    {/* 操作列 */}
-                    <div className='flex items-center justify-end'>
-                      {/* 重复警告图标 */}
-                      {getRowErrors(row).duplicate && (
-                        <AlertTriangle className='mr-2 size-4 text-amber-500' />
-                      )}
-                      <Button
-                        type='button'
-                        variant='ghost'
-                        size='sm'
-                        className='size-8 p-0'
-                        onClick={() => handleDeleteRow(row.id)}
-                      >
-                        <Trash2 className='size-4' />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* 错误提示 */}
-                  {(getRowErrors(row).paramName ||
-                    getRowErrors(row).paramValue ||
-                    getRowErrors(row).ratio ||
-                    getRowErrors(row).duplicate) && (
-                    <div className='px-4 pb-2 text-xs'>
-                      {getRowErrors(row).paramName && (
-                        <div className='text-red-500'>
-                          {getRowErrors(row).paramName}
-                        </div>
-                      )}
-                      {getRowErrors(row).paramValue && (
-                        <div className='text-red-500'>
-                          {getRowErrors(row).paramValue}
-                        </div>
-                      )}
-                      {getRowErrors(row).ratio && (
-                        <div className='text-red-500'>
-                          {getRowErrors(row).ratio}
-                        </div>
-                      )}
-                      {getRowErrors(row).duplicate && (
-                        <div className='text-amber-600'>
-                          {t(
-                            'This parameter value already exists and will override the previous configuration'
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                      </div>
+                    )
+                  })}
                 </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
+
+                <div className='border-t px-3 py-1.5'>
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='sm'
+                    className='h-7 text-xs'
+                    onClick={() =>
+                      handleAddValue(group.groupId, group.paramName)
+                    }
+                  >
+                    <Plus className='mr-1 size-3.5' />
+                    {t('Add value')}
+                  </Button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

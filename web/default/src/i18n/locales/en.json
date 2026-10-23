@@ -5261,6 +5261,10 @@
     "Output Seconds": "Output Seconds",
     "Billed Seconds": "Billed Seconds",
     "Not provided": "Not provided",
-    "{{count}} items": "{{count}} items"
+    "{{count}} items": "{{count}} items",
+    "Add value": "Add value",
+    "Delete parameter": "Delete parameter",
+    "Note (shown in model marketplace)": "Note (shown in model marketplace)",
+    "This parameter name is already used by another group": "This parameter name is already used by another group"
   }
 }

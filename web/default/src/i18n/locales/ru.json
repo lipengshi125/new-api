@@ -5261,6 +5261,10 @@
     "Output Seconds": "Выходные секунды",
     "Billed Seconds": "Оплачиваемые секунды",
     "Not provided": "Не указано",
-    "{{count}} items": "{{count}} шт."
+    "{{count}} items": "{{count}} шт.",
+    "Add value": "Добавить значение",
+    "Delete parameter": "Удалить параметр",
+    "Note (shown in model marketplace)": "Примечание (отображается в каталоге моделей)",
+    "This parameter name is already used by another group": "Это имя параметра уже используется другой группой"
   }
 }

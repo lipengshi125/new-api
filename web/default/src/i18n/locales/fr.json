@@ -5261,6 +5261,10 @@
     "Output Seconds": "Secondes en sortie",
     "Billed Seconds": "Secondes facturées",
     "Not provided": "Non fourni",
-    "{{count}} items": "{{count}} éléments"
+    "{{count}} items": "{{count}} éléments",
+    "Add value": "Ajouter une valeur",
+    "Delete parameter": "Supprimer le paramètre",
+    "Note (shown in model marketplace)": "Note (affichée sur la place de marché des modèles)",
+    "This parameter name is already used by another group": "Ce nom de paramètre est déjà utilisé par un autre groupe"
   }
 }

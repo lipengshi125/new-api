@@ -33,6 +33,7 @@ export type ModelPricingSnapshotInput = {
   billingMode: string
   billingExpr: string
   customRatios: string
+  customRatioNotes?: string
 }
 
 export type ModelPricingSnapshot = {
@@ -49,6 +50,7 @@ export type ModelPricingSnapshot = {
   billingExpr?: string
   requestRuleExpr?: string
   customRatios?: Record<string, Record<string, number>>
+  customRatioNotes?: Record<string, Record<string, string>>
   hasConflict: boolean
 }
 
@@ -177,6 +179,7 @@ export const buildModelSnapshots = ({
   billingMode,
   billingExpr,
   customRatios,
+  customRatioNotes,
 }: ModelPricingSnapshotInput): ModelPricingSnapshot[] => {
   const priceMap = safeJsonParse<Record<string, number>>(modelPrice, {
     fallback: {},
@@ -224,6 +227,12 @@ export const buildModelSnapshots = ({
     fallback: {},
     context: 'custom ratios',
   })
+  const customRatioNotesMap = safeJsonParse<
+    Record<string, Record<string, Record<string, string>>>
+  >(customRatioNotes || '{}', {
+    fallback: {},
+    context: 'custom ratio notes',
+  })
 
   const modelNames = new Set([
     ...Object.keys(priceMap),
@@ -249,6 +258,7 @@ export const buildModelSnapshots = ({
     const audio = audioMap[name]?.toString() || ''
     const audioCompletion = audioCompletionMap[name]?.toString() || ''
     const modelCustomRatios = customRatiosMap[name]
+    const modelCustomRatioNotes = customRatioNotesMap[name]
 
     const modeForModel = billingModeMap[name]
     if (modeForModel === 'tiered_expr') {
@@ -269,6 +279,7 @@ export const buildModelSnapshots = ({
         audioRatio: audio,
         audioCompletionRatio: audioCompletion,
         customRatios: modelCustomRatios,
+        customRatioNotes: modelCustomRatioNotes,
         hasConflict: false,
       }
     }
@@ -284,6 +295,7 @@ export const buildModelSnapshots = ({
       audioRatio: audio,
       audioCompletionRatio: audioCompletion,
       customRatios: modelCustomRatios,
+      customRatioNotes: modelCustomRatioNotes,
       billingMode: price !== '' ? 'per-request' : 'per-token',
       hasConflict:
         price !== '' &&
@@ -313,5 +325,6 @@ export const getSnapshotSignature = (snapshot?: ModelPricingSnapshot) => {
     billingExpr: snapshot.billingExpr || '',
     requestRuleExpr: snapshot.requestRuleExpr || '',
     customRatios: snapshot.customRatios || {},
+    customRatioNotes: snapshot.customRatioNotes || {},
   })
 }

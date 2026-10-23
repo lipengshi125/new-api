@@ -86,6 +86,8 @@ export type ModelRatioData = {
   requestRuleExpr?: string
   billingUnit?: BillingUnit
   customRatios?: Record<string, Record<string, number>>
+  // 自定义倍率备注（仅展示，不参与计费）：param_name -> param_value -> note
+  customRatioNotes?: Record<string, Record<string, string>>
 }
 
 export type PreviewRow = {
@@ -344,13 +346,15 @@ export type FlatRatioRow = {
   paramName: string
   paramValue: string
   ratio: number
+  note: string
 }
 
 /**
- * 将嵌套的 customRatios 结构转换为扁平的行数组，便于表格渲染
+ * 将嵌套的 customRatios 结构（及备注）转换为扁平的行数组，便于表格渲染
  */
 export function flattenCustomRatios(
-  ratios: Record<string, Record<string, number>>
+  ratios: Record<string, Record<string, number>>,
+  notes: Record<string, Record<string, string>> = {}
 ): FlatRatioRow[] {
   const rows: FlatRatioRow[] = []
   Object.entries(ratios).forEach(([paramName, valueMap]) => {
@@ -360,25 +364,30 @@ export function flattenCustomRatios(
         paramName,
         paramValue,
         ratio,
+        note: notes[paramName]?.[paramValue] ?? '',
       })
     })
   })
-  // 按参数名排序，相同参数名的行连续显示
+  // 按参数名排序，相同参数名的行连续显示；参数值按自然顺序（480p < 720p < 1080p）
   return rows.sort((a, b) => {
     if (a.paramName === b.paramName) {
-      return a.paramValue.localeCompare(b.paramValue)
+      return a.paramValue.localeCompare(b.paramValue, undefined, {
+        numeric: true,
+      })
     }
     return a.paramName.localeCompare(b.paramName)
   })
 }
 
 /**
- * 将扁平的行数组转换回嵌套的 customRatios 结构
+ * 将扁平的行数组转换回嵌套的 customRatios 结构与备注结构
  */
-export function unflattenCustomRatios(
-  rows: FlatRatioRow[]
-): Record<string, Record<string, number>> {
+export function unflattenCustomRatios(rows: FlatRatioRow[]): {
+  ratios: Record<string, Record<string, number>>
+  notes: Record<string, Record<string, string>>
+} {
   const ratios: Record<string, Record<string, number>> = {}
+  const notes: Record<string, Record<string, string>> = {}
   rows.forEach((row) => {
     // 跳过尚未填写完整或非法的行：空的参数名/参数值、以及非正/非有限的倍率
     // 都不应写入，既让编辑中的行保持可编辑，又避免污染保存的数据
@@ -387,10 +396,13 @@ export function unflattenCustomRatios(
     const val = row.paramValue.trim()
     if (!name || !val) return
     if (!Number.isFinite(row.ratio) || row.ratio <= 0) return
-    if (!ratios[name]) {
-      ratios[name] = {}
-    }
+    ratios[name] ??= {}
     ratios[name][val] = row.ratio
+    const note = row.note.trim()
+    if (note) {
+      notes[name] ??= {}
+      notes[name][val] = note
+    }
   })
-  return ratios
+  return { ratios, notes }
 }

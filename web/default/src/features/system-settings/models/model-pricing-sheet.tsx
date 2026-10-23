@@ -53,6 +53,7 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from '@/components/ui/input-group'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import {
   Sheet,
   SheetContent,
@@ -63,6 +64,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
+import { CustomRatiosTable } from './custom-ratios-table'
 import {
   EMPTY_LANE_ENABLED,
   EMPTY_LANE_PRICES,
@@ -81,14 +83,9 @@ import {
   type ModelRatioData,
   type PricingMode,
 } from './model-pricing-core'
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from '@/components/ui/native-select'
 import { PriceInput, PriceLane } from './model-pricing-inputs'
 import { formatPricingNumber } from './pricing-format'
 import { TieredPricingEditor } from './tiered-pricing-editor'
-import { CustomRatiosTable } from './custom-ratios-table'
 
 export type { ModelRatioData } from './model-pricing-core'
 
@@ -167,6 +164,9 @@ export const ModelPricingEditorPanel = forwardRef<
   const [customRatios, setCustomRatios] = useState<
     Record<string, Record<string, number>>
   >({})
+  const [customRatioNotes, setCustomRatioNotes] = useState<
+    Record<string, Record<string, string>>
+  >({})
   const isEditMode = !!editData
 
   const form = useForm<ModelPricingFormValues>({
@@ -209,11 +209,8 @@ export const ModelPricingEditorPanel = forwardRef<
       setBillingExpr(editData.billingExpr || '')
       setRequestRuleExpr(editData.requestRuleExpr || '')
       setBillingUnit(editData.billingUnit || inferBillingUnit(editData.name))
-      if (editData?.customRatios) {
-        setCustomRatios(editData.customRatios)
-      } else {
-        setCustomRatios({})
-      }
+      setCustomRatios(editData.customRatios ?? {})
+      setCustomRatioNotes(editData.customRatioNotes ?? {})
     } else {
       form.reset({
         name: '',
@@ -231,6 +228,7 @@ export const ModelPricingEditorPanel = forwardRef<
       setRequestRuleExpr('')
       setBillingUnit('request')
       setCustomRatios({})
+      setCustomRatioNotes({})
     }
 
     setPromptPrice(nextLaneState.promptPrice)
@@ -485,10 +483,18 @@ export const ModelPricingEditorPanel = forwardRef<
       // the editor expresses "the admin deleted every parameter row", and the
       // persist step needs to see that to drop the model's stored entry.
       data.customRatios = customRatios
+      data.customRatioNotes = customRatioNotes
 
       return data
     },
-    [billingExpr, billingUnit, pricingMode, requestRuleExpr, customRatios]
+    [
+      billingExpr,
+      billingUnit,
+      pricingMode,
+      requestRuleExpr,
+      customRatios,
+      customRatioNotes,
+    ]
   )
 
   useImperativeHandle(
@@ -703,7 +709,11 @@ export const ModelPricingEditorPanel = forwardRef<
                     <CustomRatiosTable
                       key={editorReloadToken}
                       value={customRatios}
-                      onChange={setCustomRatios}
+                      notes={customRatioNotes}
+                      onChange={(ratios, notes) => {
+                        setCustomRatios(ratios)
+                        setCustomRatioNotes(notes)
+                      }}
                     />
                   </div>
                 )}

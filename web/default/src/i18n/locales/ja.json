@@ -5261,6 +5261,10 @@
     "Output Seconds": "出力秒数",
     "Billed Seconds": "課金秒数",
     "Not provided": "未指定",
-    "{{count}} items": "{{count}} 件"
+    "{{count}} items": "{{count}} 件",
+    "Add value": "値を追加",
+    "Delete parameter": "パラメータを削除",
+    "Note (shown in model marketplace)": "備考（モデルマーケットに表示されます）",
+    "This parameter name is already used by another group": "このパラメータ名は他のグループで使用されています"
   }
 }

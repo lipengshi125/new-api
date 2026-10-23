@@ -762,6 +762,27 @@ var modelPriceUnitMap = types.NewRWMap[string, string]()
 // Example: "sora-1.0" -> { "resolution" -> { "1k": 1.0, "2k": 1.2, "4k": 1.5 } }
 var customRatiosMap = types.NewRWMap[string, map[string]map[string]float64]()
 
+// customRatioNotesMap stores admin notes for custom ratio entries, shown in the
+// model marketplace. Display-only; never read by billing.
+// Format: model_name -> { param_name -> { param_value -> note } }
+var customRatioNotesMap = types.NewRWMap[string, map[string]map[string]string]()
+
+func CustomRatioNotes2JSONString() string {
+	return customRatioNotesMap.MarshalJSONString()
+}
+
+func UpdateCustomRatioNotesByJSONString(jsonStr string) error {
+	return types.LoadFromJsonStringWithCallback(customRatioNotesMap, jsonStr, InvalidateExposedDataCache)
+}
+
+// GetCustomRatioNotes returns the custom ratio notes for a model, or nil.
+func GetCustomRatioNotes(modelName string) map[string]map[string]string {
+	if notes, ok := customRatioNotesMap.Get(FormatMatchingModelName(modelName)); ok {
+		return notes
+	}
+	return nil
+}
+
 func GetModelPriceUnitMap() map[string]string {
 	return modelPriceUnitMap.ReadAll()
 }

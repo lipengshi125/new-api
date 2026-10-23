@@ -5261,6 +5261,10 @@
     "Output Seconds": "Số giây đầu ra",
     "Billed Seconds": "Số giây tính phí",
     "Not provided": "Không cung cấp",
-    "{{count}} items": "{{count}} mục"
+    "{{count}} items": "{{count}} mục",
+    "Add value": "Thêm giá trị",
+    "Delete parameter": "Xóa tham số",
+    "Note (shown in model marketplace)": "Ghi chú (hiển thị trên chợ mô hình)",
+    "This parameter name is already used by another group": "Tên tham số này đã được nhóm khác sử dụng"
   }
 }
