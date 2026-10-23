@@ -34,16 +34,14 @@ import {
   getDynamicPricingSummary,
 } from '../lib/dynamic-price'
 import { parseTags } from '../lib/filters'
-import {
-  formatCustomRatioCondition,
-  isTokenBasedModel,
-} from '../lib/model-helpers'
+import { isTokenBasedModel } from '../lib/model-helpers'
 import {
   formatPrice,
   formatRequestPrice,
   stripTrailingZeros,
 } from '../lib/price'
 import type { PricingModel, TokenUnit } from '../types'
+import { CustomRatiosSummary } from './custom-ratios-summary'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 
 // ----------------------------------------------------------------------------
@@ -213,35 +211,7 @@ export function usePricingColumns(
               <div className='text-muted-foreground/50 text-[10px]'>
                 / {tokenUnitLabel} tokens
               </div>
-              {model.custom_ratios &&
-                Object.keys(model.custom_ratios).length > 0 && (
-                  <div className='border-border/30 mt-1.5 space-y-0.5 border-t pt-1'>
-                    <div className='text-muted-foreground/70 text-[9px] font-semibold tracking-wide uppercase'>
-                      {t('Parameter Multipliers')}
-                    </div>
-                    {Object.entries(model.custom_ratios).map(
-                      ([paramName, valueMap]) =>
-                        Object.entries(valueMap).map(([paramValue, ratio]) => (
-                          <div
-                            key={`${paramName}-${paramValue}`}
-                            className='flex items-center gap-1.5 text-[10px]'
-                          >
-                            <span className='text-muted-foreground'>
-                              {formatCustomRatioCondition(
-                                paramName,
-                                paramValue,
-                                t
-                              )}
-                              :
-                            </span>
-                            <span className='font-mono font-semibold text-purple-600 dark:text-purple-400'>
-                              ×{ratio}
-                            </span>
-                          </div>
-                        ))
-                    )}
-                  </div>
-                )}
+              <CustomRatiosSummary model={model} />
             </div>
           )
         }
@@ -262,35 +232,7 @@ export function usePricingColumns(
             <div className='text-muted-foreground/50 text-[10px]'>
               / {model.billing_unit === 'second' ? t('sec') : t('request')}
             </div>
-            {model.custom_ratios &&
-              Object.keys(model.custom_ratios).length > 0 && (
-                <div className='border-border/30 mt-1.5 space-y-0.5 border-t pt-1'>
-                  <div className='text-muted-foreground/70 text-[9px] font-semibold tracking-wide uppercase'>
-                    {t('Parameter Multipliers')}
-                  </div>
-                  {Object.entries(model.custom_ratios).map(
-                    ([paramName, valueMap]) =>
-                      Object.entries(valueMap).map(([paramValue, ratio]) => (
-                        <div
-                          key={`${paramName}-${paramValue}`}
-                          className='flex items-center gap-1.5 text-[10px]'
-                        >
-                          <span className='text-muted-foreground'>
-                            {formatCustomRatioCondition(
-                              paramName,
-                              paramValue,
-                              t
-                            )}
-                            :
-                          </span>
-                          <span className='font-mono font-semibold text-purple-600 dark:text-purple-400'>
-                            ×{ratio}
-                          </span>
-                        </div>
-                      ))
-                  )}
-                </div>
-              )}
+            <CustomRatiosSummary model={model} />
           </div>
         )
       },

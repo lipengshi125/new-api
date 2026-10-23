@@ -4224,6 +4224,9 @@
     "默认折叠侧边栏": "Mặc định thu gọn thanh bên",
     "默认测试模型": "Mô hình kiểm tra mặc định",
     "默认用户消息": "Xin chào",
-    "默认补全倍率": "Tỷ lệ hoàn thành mặc định"
+    "默认补全倍率": "Tỷ lệ hoàn thành mặc định",
+    "参数倍率": "Hệ số tham số",
+    "备注（会显示在模型广场）": "Ghi chú (hiển thị trên chợ mô hình)",
+    "添加值": "Thêm giá trị"
   }
 }

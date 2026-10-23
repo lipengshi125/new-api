@@ -756,8 +756,13 @@ export default function ModelPricingEditor({
                 {selectedModel.billingMode !== 'tiered_expr' ? (
                   <CustomRatiosEditor
                     customRatios={selectedModel.customRatios || {}}
-                    onChange={(newCustomRatios) =>
-                      handleCustomRatiosChange(selectedModel.name, newCustomRatios)
+                    customRatioNotes={selectedModel.customRatioNotes || {}}
+                    onChange={(newCustomRatios, newCustomRatioNotes) =>
+                      handleCustomRatiosChange(
+                        selectedModel.name,
+                        newCustomRatios,
+                        newCustomRatioNotes,
+                      )
                     }
                     t={t}
                   />

@@ -66,23 +66,8 @@ const ModelPricingTable = ({
       const groupRatioValue =
         groupRatio && groupRatio[group] ? groupRatio[group] : 1;
 
-      // 获取价格项
+      // 获取价格项（自定义参数倍率在下方单独的「参数倍率」表中展示）
       const priceItems = getModelPriceItems(priceData, t, siteDisplayType);
-
-      // 如果有自定义倍率配置，添加到价格项中
-      if (modelData?.custom_ratios && Object.keys(modelData.custom_ratios).length > 0) {
-        Object.entries(modelData.custom_ratios).forEach(([paramName, valueMap]) => {
-          Object.entries(valueMap).forEach(([paramValue, ratio]) => {
-            priceItems.push({
-              key: `custom-${paramName}-${paramValue}`,
-              label: `${t('参数')} ${paramName}=${paramValue}`,
-              value: `${t('价格')} ×${ratio}`,
-              suffix: '',
-              isCustomRatio: true,
-            });
-          });
-        });
-      }
 
       return {
         key: group,
@@ -183,6 +168,91 @@ const ModelPricingTable = ({
     );
   };
 
+  // 参数倍率：按参数名分组，组头「参数名 | 倍率 | 备注」，其下每个参数值一行
+  const renderCustomRatiosTable = () => {
+    const customRatios = modelData?.custom_ratios || {};
+    const notes = modelData?.custom_ratio_notes || {};
+    const groups = Object.entries(customRatios)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([paramName, valueMap]) => ({
+        paramName,
+        rows: Object.entries(valueMap || {}).sort(([a], [b]) =>
+          a.localeCompare(b, undefined, { numeric: true }),
+        ),
+      }))
+      .filter((group) => group.rows.length > 0);
+    if (groups.length === 0) return null;
+
+    const cellStyle = { padding: '8px 12px', verticalAlign: 'top' };
+    return (
+      <div className='mt-6'>
+        <Text className='text-base font-medium'>{t('参数倍率')}</Text>
+        <div
+          className='mt-2 overflow-hidden rounded-lg'
+          style={{ border: '1px solid var(--semi-color-border)' }}
+        >
+          <table className='w-full text-sm' style={{ tableLayout: 'fixed' }}>
+            <colgroup>
+              <col style={{ width: '30%' }} />
+              <col style={{ width: '18%' }} />
+              <col />
+            </colgroup>
+            {groups.map((group) => (
+              <tbody key={group.paramName}>
+                <tr style={{ background: 'var(--semi-color-fill-0)' }}>
+                  <th
+                    scope='rowgroup'
+                    className='text-left font-mono font-semibold break-all'
+                    style={cellStyle}
+                  >
+                    {group.paramName}
+                  </th>
+                  <th
+                    className='text-left text-xs text-gray-500'
+                    style={cellStyle}
+                  >
+                    {t('倍率')}
+                  </th>
+                  <th
+                    className='text-left text-xs text-gray-500'
+                    style={cellStyle}
+                  >
+                    {t('备注')}
+                  </th>
+                </tr>
+                {group.rows.map(([paramValue, ratio]) => (
+                  <tr
+                    key={paramValue}
+                    style={{ borderTop: '1px solid var(--semi-color-border)' }}
+                  >
+                    <td
+                      className='font-mono text-gray-600 break-all'
+                      style={cellStyle}
+                    >
+                      {paramValue}
+                    </td>
+                    <td
+                      className='font-mono font-semibold text-purple-600'
+                      style={cellStyle}
+                    >
+                      ×{ratio}
+                    </td>
+                    <td
+                      className='text-gray-600'
+                      style={{ ...cellStyle, wordBreak: 'break-word' }}
+                    >
+                      {notes[group.paramName]?.[paramValue] || '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            ))}
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div>
       <div className='flex items-center mb-4'>
@@ -212,6 +282,7 @@ const ModelPricingTable = ({
         </div>
       )}
       {renderGroupPriceTable()}
+      {renderCustomRatiosTable()}
     </div>
   );
 };

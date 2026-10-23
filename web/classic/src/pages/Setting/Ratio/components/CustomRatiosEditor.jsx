@@ -18,74 +18,108 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React from 'react';
-import { Button, Card, Input, Space } from '@douyinfe/semi-ui';
+import { Button, Card, Input } from '@douyinfe/semi-ui';
 import { IconDelete, IconPlus } from '@douyinfe/semi-icons';
 
-export default function CustomRatiosEditor({ customRatios, onChange, t }) {
+// 参数名 | 倍率 | 备注 三列，备注列最宽
+const GRID_STYLE = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1.2fr) 110px minmax(0, 2fr) 32px',
+  gap: 8,
+  alignItems: 'center',
+};
+
+export default function CustomRatiosEditor({
+  customRatios,
+  customRatioNotes,
+  onChange,
+  t,
+}) {
+  const ratios = customRatios || {};
+  const notes = customRatioNotes || {};
+
+  const emit = (nextRatios, nextNotes) => onChange(nextRatios, nextNotes);
+
   const handleAddParam = () => {
-    const newCustomRatios = { ...customRatios };
-    const paramName = `param_${Object.keys(newCustomRatios).length + 1}`;
-    newCustomRatios[paramName] = { '': 1.0 };
-    onChange(newCustomRatios);
+    const paramName = `param_${Object.keys(ratios).length + 1}`;
+    emit({ ...ratios, [paramName]: { '': 1.0 } }, notes);
   };
 
   const handleDeleteParam = (paramName) => {
-    const newCustomRatios = { ...customRatios };
-    delete newCustomRatios[paramName];
-    onChange(newCustomRatios);
+    const nextRatios = { ...ratios };
+    const nextNotes = { ...notes };
+    delete nextRatios[paramName];
+    delete nextNotes[paramName];
+    emit(nextRatios, nextNotes);
+  };
+
+  // 重命名时保持参数顺序，并把备注一并迁移
+  const renameKey = (source, oldKey, newKey) => {
+    const result = {};
+    for (const key in source) {
+      result[key === oldKey ? newKey : key] = source[key];
+    }
+    return result;
   };
 
   const handleParamNameChange = (oldName, newName) => {
     if (oldName === newName) return;
-    const newCustomRatios = {};
-    for (const key in customRatios) {
-      if (key === oldName) {
-        newCustomRatios[newName] = customRatios[key];
-      } else {
-        newCustomRatios[key] = customRatios[key];
-      }
-    }
-    onChange(newCustomRatios);
+    emit(
+      renameKey(ratios, oldName, newName),
+      renameKey(notes, oldName, newName),
+    );
   };
 
   const handleAddValue = (paramName) => {
-    const newCustomRatios = { ...customRatios };
-    newCustomRatios[paramName] = { ...newCustomRatios[paramName], '': 1.0 };
-    onChange(newCustomRatios);
+    emit({ ...ratios, [paramName]: { ...ratios[paramName], '': 1.0 } }, notes);
   };
 
   const handleDeleteValue = (paramName, valueName) => {
-    const newCustomRatios = { ...customRatios };
-    const newValues = { ...newCustomRatios[paramName] };
-    delete newValues[valueName];
-    newCustomRatios[paramName] = newValues;
-    onChange(newCustomRatios);
+    const nextValues = { ...ratios[paramName] };
+    delete nextValues[valueName];
+    const nextNoteValues = { ...(notes[paramName] || {}) };
+    delete nextNoteValues[valueName];
+    emit(
+      { ...ratios, [paramName]: nextValues },
+      { ...notes, [paramName]: nextNoteValues },
+    );
   };
 
   const handleValueNameChange = (paramName, oldValueName, newValueName) => {
     if (oldValueName === newValueName) return;
-    const newCustomRatios = { ...customRatios };
-    const newValues = {};
-    for (const key in newCustomRatios[paramName]) {
-      if (key === oldValueName) {
-        newValues[newValueName] = newCustomRatios[paramName][key];
-      } else {
-        newValues[key] = newCustomRatios[paramName][key];
-      }
-    }
-    newCustomRatios[paramName] = newValues;
-    onChange(newCustomRatios);
+    emit(
+      {
+        ...ratios,
+        [paramName]: renameKey(ratios[paramName], oldValueName, newValueName),
+      },
+      {
+        ...notes,
+        [paramName]: renameKey(
+          notes[paramName] || {},
+          oldValueName,
+          newValueName,
+        ),
+      },
+    );
   };
 
   const handleRatioChange = (paramName, valueName, ratio) => {
     const numRatio = parseFloat(ratio);
     if (isNaN(numRatio)) return;
-    const newCustomRatios = { ...customRatios };
-    newCustomRatios[paramName] = {
-      ...newCustomRatios[paramName],
-      [valueName]: numRatio,
-    };
-    onChange(newCustomRatios);
+    emit(
+      {
+        ...ratios,
+        [paramName]: { ...ratios[paramName], [valueName]: numRatio },
+      },
+      notes,
+    );
+  };
+
+  const handleNoteChange = (paramName, valueName, note) => {
+    emit(ratios, {
+      ...notes,
+      [paramName]: { ...(notes[paramName] || {}), [valueName]: note },
+    });
   };
 
   return (
@@ -103,25 +137,31 @@ export default function CustomRatiosEditor({ customRatios, onChange, t }) {
         {t('从请求中提取自定义参数并应用对应倍率，如 resolution=4k → x1.5')}
       </div>
 
-      {Object.keys(customRatios || {}).length === 0 ? (
+      {Object.keys(ratios).length === 0 ? (
         <div className='text-center text-gray-400 py-4'>
           {t('暂无自定义参数，点击"添加参数"创建')}
         </div>
       ) : null}
 
-      {Object.entries(customRatios || {}).map(([paramName, valueMap]) => (
+      {Object.entries(ratios).map(([paramName, valueMap]) => (
         <Card
           key={paramName}
           bodyStyle={{ padding: 12 }}
           style={{ marginBottom: 12, background: 'var(--semi-color-bg-2)' }}
         >
-          <div className='flex items-center gap-2 mb-2'>
+          {/* 组头：参数名 | 倍率 | 备注 */}
+          <div style={{ ...GRID_STYLE, marginBottom: 8 }}>
             <Input
               value={paramName}
               placeholder={t('参数名 (如 resolution)')}
               onChange={(value) => handleParamNameChange(paramName, value)}
-              style={{ flex: 1 }}
             />
+            <div className='text-xs font-semibold text-gray-500'>
+              {t('倍率')}
+            </div>
+            <div className='text-xs font-semibold text-gray-500'>
+              {t('备注')}
+            </div>
             <Button
               size='small'
               type='danger'
@@ -130,17 +170,16 @@ export default function CustomRatiosEditor({ customRatios, onChange, t }) {
             />
           </div>
 
+          {/* 参数值行：参数值 | 倍率 | 备注 */}
           {Object.entries(valueMap || {}).map(([valueName, ratio]) => (
-            <Space key={valueName} style={{ width: '100%', marginBottom: 8 }}>
+            <div key={valueName} style={{ ...GRID_STYLE, marginBottom: 8 }}>
               <Input
                 value={valueName}
                 placeholder={t('参数值 (如 4k)')}
                 onChange={(value) =>
                   handleValueNameChange(paramName, valueName, value)
                 }
-                style={{ width: 120 }}
               />
-              <span>=</span>
               <Input
                 type='number'
                 value={ratio}
@@ -149,9 +188,16 @@ export default function CustomRatiosEditor({ customRatios, onChange, t }) {
                   handleRatioChange(paramName, valueName, value)
                 }
                 suffix='x'
-                style={{ width: 100 }}
                 step={0.1}
                 min={0}
+              />
+              <Input
+                value={notes[paramName]?.[valueName] ?? ''}
+                placeholder={t('备注（会显示在模型广场）')}
+                maxLength={200}
+                onChange={(value) =>
+                  handleNoteChange(paramName, valueName, value)
+                }
               />
               <Button
                 size='small'
@@ -159,7 +205,7 @@ export default function CustomRatiosEditor({ customRatios, onChange, t }) {
                 icon={<IconDelete />}
                 onClick={() => handleDeleteValue(paramName, valueName)}
               />
-            </Space>
+            </div>
           ))}
 
           <Button

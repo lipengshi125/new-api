@@ -44,6 +44,7 @@ const EMPTY_MODEL = {
   billingExpr: '',
   requestRuleExpr: '',
   customRatios: {},
+  customRatioNotes: {},
   rawRatios: {
     modelRatio: '',
     completionRatio: '',
@@ -172,6 +173,7 @@ const buildModelState = (name, sourceMaps) => {
   const fixedPrice = toNumericString(sourceMaps.ModelPrice[name]);
   const billingUnit = sourceMaps.ModelPriceUnit?.[name] || inferBillingUnit(name);
   const customRatios = sourceMaps.CustomRatios?.[name] || {};
+  const customRatioNotes = sourceMaps.CustomRatioNotes?.[name] || {};
   const inputPrice = ratioToBasePrice(modelRatio);
   const inputPriceNumber = toNumberOrNull(inputPrice);
   const audioInputPrice =
@@ -186,6 +188,7 @@ const buildModelState = (name, sourceMaps) => {
     fixedPrice,
     billingUnit,
     customRatios,
+    customRatioNotes,
     inputPrice,
     completionRatioLocked: completionRatioMeta.locked,
     lockedCompletionRatio: completionRatioMeta.ratio,
@@ -684,6 +687,7 @@ export function useModelPricingEditorState({
       // CustomRatios 表并整体 PUT，若这里不加载，每个模型都会得到 {}，
       // 保存时反而把后端已存的自定义倍率清空。
       CustomRatios: parseOptionJSON(options.CustomRatios),
+      CustomRatioNotes: parseOptionJSON(options.CustomRatioNotes),
     };
 
     const names = new Set([
@@ -1090,10 +1094,20 @@ export function useModelPricingEditorState({
     return true;
   };
 
-  const handleCustomRatiosChange = (modelName, newCustomRatios) => {
+  const handleCustomRatiosChange = (
+    modelName,
+    newCustomRatios,
+    newCustomRatioNotes,
+  ) => {
     setModels((prev) =>
       prev.map((m) =>
-        m.name === modelName ? { ...m, customRatios: newCustomRatios } : m,
+        m.name === modelName
+          ? {
+              ...m,
+              customRatios: newCustomRatios,
+              customRatioNotes: newCustomRatioNotes ?? m.customRatioNotes,
+            }
+          : m,
       ),
     );
   };
@@ -1112,6 +1126,7 @@ export function useModelPricingEditorState({
         AudioRatio: {},
         AudioCompletionRatio: {},
         CustomRatios: {},
+        CustomRatioNotes: {},
       };
 
       const tieredOutput = {
@@ -1159,6 +1174,21 @@ export function useModelPricingEditorState({
         // Save customRatios if present
         if (model.customRatios && Object.keys(model.customRatios).length > 0) {
           output.CustomRatios[model.name] = model.customRatios;
+          // 备注只保留仍存在的参数值，且去掉空白备注
+          const notes = {};
+          Object.entries(model.customRatios).forEach(([paramName, valueMap]) => {
+            Object.keys(valueMap || {}).forEach((paramValue) => {
+              const note = String(
+                model.customRatioNotes?.[paramName]?.[paramValue] ?? '',
+              ).trim();
+              if (!note) return;
+              notes[paramName] = notes[paramName] || {};
+              notes[paramName][paramValue] = note;
+            });
+          });
+          if (Object.keys(notes).length > 0) {
+            output.CustomRatioNotes[model.name] = notes;
+          }
         }
       }
 
