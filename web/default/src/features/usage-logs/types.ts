@@ -226,6 +226,8 @@ export interface LogOtherData {
   is_task?: boolean
   task_id?: string
   reason?: string
+  // Billed seconds of a per-second async task (the "seconds" multiplier)
+  billing_seconds?: number
   // Custom parameter multipliers hit by an async task (per-call / per-second)
   custom_ratios?: Array<{
     name: string

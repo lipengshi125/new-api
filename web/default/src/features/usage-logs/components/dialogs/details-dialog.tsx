@@ -262,11 +262,32 @@ function BillingBreakdown(props: {
       })
     }
   } else if (isPerCall) {
-    rows.push({ label: t('Billing Mode'), value: t('Per-call') })
+    // 按秒计费的任务：新日志读 billing_seconds，旧日志从内容「seconds: 3.00」/「按3秒计费」中解析
+    const contentSeconds = /seconds: ([\d.]+)|按([\d.]+)秒计费/.exec(
+      log.content ?? ''
+    )
+    const billingSeconds =
+      other.billing_seconds ??
+      (contentSeconds
+        ? Number(contentSeconds[1] ?? contentSeconds[2])
+        : undefined)
+    const isPerSecond = billingSeconds != null && billingSeconds > 0
+    rows.push({
+      label: t('Billing Mode'),
+      value: isPerSecond ? t('Per Second') : t('Per-call'),
+    })
     if (other.model_price != null) {
       rows.push({
         label: t('Model Price'),
-        value: fmtPrice(other.model_price),
+        value: isPerSecond
+          ? `${fmtPrice(other.model_price)} / ${t('sec')}`
+          : fmtPrice(other.model_price),
+      })
+    }
+    if (isPerSecond) {
+      rows.push({
+        label: t('Billed Seconds'),
+        value: `${Number(billingSeconds.toFixed(2))}s`,
       })
     }
   } else {

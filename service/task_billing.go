@@ -92,6 +92,10 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 	if len(info.CustomRatioHits) > 0 {
 		other["custom_ratios"] = info.CustomRatioHits
 	}
+	// 按秒计费的任务：记录计费秒数，供计费详情展示「模型价格 × 秒数」
+	if s := info.PriceData.OtherRatios()["seconds"]; s > 0 {
+		other["billing_seconds"] = s
+	}
 	if exprBilling := info.TaskExprBilling; exprBilling != nil {
 		taskExpr := map[string]interface{}{
 			"output_seconds": exprBilling.OutputSeconds,

@@ -1641,9 +1641,16 @@ export const TieredPricingEditor = memo(function TieredPricingEditor({
   onRequestRuleExprChange,
 }: TieredPricingEditorProps) {
   const { t } = useTranslation()
-  const [editorMode, setEditorMode] = useState<EditorMode>('visual')
-  const [visualConfig, setVisualConfig] = useState<VisualConfig | null>(() =>
-    tryParseVisualConfig(currentExpr)
+  // 首次渲染就必须得到正确的模式：可视化编辑器无法解析的表达式（如含
+  // video_seconds/float）要直接进入原始模式。否则首帧以空的可视化配置生成
+  // 「p * 0 + c * 0」，并在初始化 effect 切换模式之前被同步回父组件，覆盖掉原表达式。
+  const [visualConfig, setVisualConfig] = useState<VisualConfig | null>(() => {
+    const parsed = tryParseVisualConfig(currentExpr)
+    if (parsed) return parsed
+    return currentExpr ? null : createDefaultVisualConfig()
+  })
+  const [editorMode, setEditorMode] = useState<EditorMode>(() =>
+    currentExpr && !tryParseVisualConfig(currentExpr) ? 'raw' : 'visual'
   )
   const [rawExpr, setRawExpr] = useState(() =>
     combineBillingExpr(currentExpr || '', currentRequestRuleExpr || '')
