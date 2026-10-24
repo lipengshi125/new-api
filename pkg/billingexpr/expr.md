@@ -80,7 +80,7 @@ Powered by [expr-lang/expr](https://github.com/expr-lang/expr). Expressions are 
 | `param` | `param(path) → any` | Reads a JSON path from the request body (uses gjson) |
 | `header` | `header(key) → string` | Reads a request header value |
 | `has` | `has(source, substr) → bool` | Substring check |
-| `video_seconds` | `video_seconds(path) → float64` | Total duration (seconds) of MP4/MOV video URLs at a request body path. Async task billing only: before evaluation the gateway probes each URL via the SSRF-protected client (HTTP Range, falling back to a bounded full download), caps each video and the total at 3600s, and rejects the request if any video cannot be read. The path must be a string literal. Elsewhere it evaluates to 0 |
+| `video_seconds` | `video_seconds(path[, max]) → float64` | Total duration (whole seconds) of MP4/MOV video URLs at a request body path. Async task billing only: before evaluation the gateway probes each URL via the SSRF-protected client (HTTP Range, falling back to a bounded full download), rounds each video to whole seconds, caps each video and the total at 3600s, and rejects the request if any video cannot be read. The path must be a string literal. Optional `max` (positive numeric literal) is a total-duration limit: when exceeded the request is rejected with 400 `video_duration_exceeded` during pricing, before pre-consume, so nothing is charged and the upstream is not called. Elsewhere it evaluates to 0 |
 | `hour` | `hour(tz) → int` | Current hour in timezone (0-23) |
 | `minute` | `minute(tz) → int` | Current minute (0-59) |
 | `weekday` | `weekday(tz) → int` | Day of week (0=Sunday, 6=Saturday) |

@@ -40,7 +40,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 export type TaskSecondsSource =
   | { kind: 'param'; path: string }
-  | { kind: 'video'; path: string }
+  | { kind: 'video'; path: string; maxSeconds?: number }
 
 export type TaskParamMultiplier = {
   name: string
@@ -129,8 +129,17 @@ function stripClamp(term: string): string {
 
 function parseSecondsTerm(term: string): TaskSecondsSource | null {
   const compact = stripClamp(unwrap(term).replaceAll(/\s+/g, ''))
-  const video = compact.match(/^video_seconds\("([^"]+)"\)$/)
-  if (video) return { kind: 'video', path: video[1] }
+  // video_seconds("videos") 或 video_seconds("videos", 15)（第二个参数为总时长上限）
+  const video = compact.match(
+    /^video_seconds\("([^"]+)"(?:,(\d+(?:\.\d+)?))?\)$/
+  )
+  if (video) {
+    return {
+      kind: 'video',
+      path: video[1],
+      ...(video[2] ? { maxSeconds: Number(video[2]) } : {}),
+    }
+  }
   const param = compact.match(
     /^(?:float\()?param\("([^"]+)"\)(?:\?\?\d+(?:\.\d+)?)?\)?$/
   )
@@ -186,14 +195,17 @@ function parseBase(
   }
 }
 
+// 比较值支持字符串（"1080p"）、布尔（true/false）和数字（5）
+const COMPARE_VALUE = `(?:${STR}|(true|false|-?\\d+(?:\\.\\d+)?))`
+
 function parseMultiplierFactor(factor: string): TaskParamMultiplier | null {
   const m = unwrap(factor).match(
     new RegExp(
-      `^param\\(\\s*${STR}\\s*\\)\\s*==\\s*${STR}\\s*\\?\\s*${NUM}\\s*:\\s*1$`
+      `^param\\(\\s*${STR}\\s*\\)\\s*==\\s*${COMPARE_VALUE}\\s*\\?\\s*${NUM}\\s*:\\s*1$`
     )
   )
   if (!m) return null
-  return { name: m[1], value: m[2], ratio: Number(m[3]) }
+  return { name: m[1], value: m[2] ?? m[3], ratio: Number(m[4]) }
 }
 
 export function parseTaskExprPricing(

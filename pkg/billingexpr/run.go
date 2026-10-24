@@ -100,7 +100,9 @@ func newRuntimeEnv(params TokenParams, request RequestInput, trace *TraceResult)
 			}
 			return result.Value()
 		},
-		"video_seconds": func(path string) float64 {
+		// video_seconds(path[, max])：上限由调用方在探测时校验（超出则拒绝请求），
+		// 这里只返回已探测的总秒数
+		"video_seconds": func(path string, _ ...float64) float64 {
 			return request.MediaSeconds[strings.TrimSpace(path)]
 		},
 		"has": func(source interface{}, substr string) bool {

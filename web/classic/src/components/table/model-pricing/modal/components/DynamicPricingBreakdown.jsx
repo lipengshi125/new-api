@@ -135,7 +135,9 @@ function TaskExprDetails({ pricing, modelData, t }) {
   const secondsText = pricing.secondsSources
     .map((s) =>
       s.kind === 'video'
-        ? `${t('参考视频时长')}（${s.path}）`
+        ? s.maxSeconds
+          ? `${t('参考视频时长')}（${s.path}，${t('最多')} ${s.maxSeconds} ${t('秒')}）`
+          : `${t('参考视频时长')}（${s.path}）`
         : `${t('输出时长')}（${s.path}）`,
     )
     .join(' + ');

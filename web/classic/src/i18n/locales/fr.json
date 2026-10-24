@@ -3712,6 +3712,7 @@
     "未含分组倍率": "hors ratio de groupe",
     "该模型采用动态计费，详情请联系管理员。": "Ce modèle utilise une tarification dynamique. Contactez l’administrateur pour plus de détails.",
     "含参考视频": "vidéo de référence incluse",
-    "价格根据请求条件调整": "Les prix sont ajustés selon les conditions de la requête"
+    "价格根据请求条件调整": "Les prix sont ajustés selon les conditions de la requête",
+    "最多": "max"
   }
 }

@@ -74,6 +74,35 @@ func TestFixedPriceRejectsInvalidLeavesIncludingUnselectedBranches(t *testing.T)
 	}
 }
 
+func TestVideoSecondsLimitSpecs(t *testing.T) {
+	specs, err := VideoSecondsSpecs(`tier("base", 27000 * (float(param("duration") ?? 0) + video_seconds("videos", 15)))`)
+	require.NoError(t, err)
+	assert.Equal(t, []VideoSecondsSpec{{Path: "videos", MaxSeconds: 15}}, specs)
+
+	// 不带上限的旧写法保持不变
+	specs, err = VideoSecondsSpecs(`tier("base", 27000 * video_seconds("videos"))`)
+	require.NoError(t, err)
+	assert.Equal(t, []VideoSecondsSpec{{Path: "videos"}}, specs)
+
+	// 两个参数时仍能求值，上限不影响计算结果
+	cost, _, err := RunExprWithRequest(`tier("base", 27000 * video_seconds("videos", 15))`, TokenParams{}, RequestInput{MediaSeconds: map[string]float64{"videos": 10}})
+	require.NoError(t, err)
+	assert.InDelta(t, 270000, cost, 1e-6)
+
+	for _, expression := range []string{
+		`tier("base", 27000 * video_seconds("videos", 0))`,
+		`tier("base", 27000 * video_seconds("videos", -5))`,
+		`tier("base", 27000 * video_seconds("videos", param("max")))`,
+		`tier("base", 27000 * video_seconds("videos", 15, 20))`,
+		`tier("base", 27000 * video_seconds(param("path")))`,
+	} {
+		t.Run(expression, func(t *testing.T) {
+			_, err := CompileFromCache(expression)
+			require.Error(t, err)
+		})
+	}
+}
+
 func TestUsesFixedPricing(t *testing.T) {
 	assert.True(t, UsesFixedPricing(`tier("base", fixed(0.16))`))
 	// 未选中的分支也算，避免靠编译优化绕过

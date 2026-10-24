@@ -55,7 +55,7 @@ var compileEnvPrototypeV1 = map[string]interface{}{
 	"header":                 func(string) string { return "" },
 	"param":                  func(string) interface{} { return nil },
 	"has":                    func(interface{}, string) bool { return false },
-	"video_seconds":          func(string) float64 { return 0 },
+	"video_seconds":          func(string, ...float64) float64 { return 0 },
 	"hour":                   func(string) int { return 0 },
 	"minute":                 func(string) int { return 0 },
 	"weekday":                func(string) int { return 0 },
@@ -117,6 +117,9 @@ func compileFromCacheByHash(exprStr, hash string) (*vm.Program, error) {
 			return nil, fmt.Errorf("expr compile error: %w", err)
 		}
 	}
+	if err := validateVideoSecondsCalls(tree); err != nil {
+		return nil, fmt.Errorf("expr compile error: %w", err)
+	}
 	prog, err := expr.Compile(body, expr.Env(getCompileEnv(version)), expr.AsFloat64())
 	if err != nil {
 		return nil, fmt.Errorf("expr compile error: %w", err)
@@ -163,23 +166,67 @@ func extractUsedVars(prog *vm.Program) map[string]bool {
 	return vars
 }
 
-// VideoSecondsPaths returns the literal request paths passed to video_seconds()
-// in an expression, so callers know which media URLs to probe before evaluation.
-// Non-literal arguments are ignored (they would always evaluate to 0).
-func VideoSecondsPaths(exprStr string) ([]string, error) {
-	prog, err := CompileFromCache(exprStr)
-	if err != nil {
-		return nil, err
-	}
-	seen := make(map[string]bool)
-	var paths []string
-	ast.Find(prog.Node(), func(n ast.Node) bool {
+// validateVideoSecondsCalls 校验 video_seconds(path[, max])：path 必须是字符串字面量，
+// max 若提供必须是正数字面量，且最多两个参数。
+func validateVideoSecondsCalls(tree ast.Node) error {
+	var err error
+	ast.Find(tree, func(n ast.Node) bool {
 		call, ok := n.(*ast.CallNode)
-		if !ok || len(call.Arguments) != 1 {
+		if !ok || err != nil {
 			return false
 		}
 		callee, ok := call.Callee.(*ast.IdentifierNode)
 		if !ok || callee.Value != "video_seconds" {
+			return false
+		}
+		if len(call.Arguments) < 1 || len(call.Arguments) > 2 {
+			err = fmt.Errorf("video_seconds takes a path and an optional max seconds")
+			return false
+		}
+		if _, isString := call.Arguments[0].(*ast.StringNode); !isString {
+			err = fmt.Errorf("video_seconds path must be a string literal")
+			return false
+		}
+		if len(call.Arguments) == 2 {
+			limit, literal := numberLiteral(call.Arguments[1])
+			if !literal || limit <= 0 || math.IsNaN(limit) || math.IsInf(limit, 0) {
+				err = fmt.Errorf("video_seconds max seconds must be a positive numeric literal")
+			}
+		}
+		return false
+	})
+	return err
+}
+
+// VideoSecondsSpec 是表达式中一次 video_seconds(path[, max]) 的调用：
+// MaxSeconds > 0 表示参考视频总时长上限，超出时拒绝请求。
+type VideoSecondsSpec struct {
+	Path       string
+	MaxSeconds float64
+}
+
+// VideoSecondsSpecs returns the literal request paths (and optional duration
+// limits) passed to video_seconds() in an expression, so callers know which
+// media URLs to probe and which limits to enforce before evaluation.
+// The same path used with different limits keeps the strictest one.
+func VideoSecondsSpecs(exprStr string) ([]VideoSecondsSpec, error) {
+	tree, err := parseExprTree(exprStr)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := CompileFromCache(exprStr); err != nil {
+		return nil, err
+	}
+	index := make(map[string]int)
+	var specs []VideoSecondsSpec
+	var specErr error
+	ast.Find(tree, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallNode)
+		if !ok || specErr != nil {
+			return false
+		}
+		callee, ok := call.Callee.(*ast.IdentifierNode)
+		if !ok || callee.Value != "video_seconds" || len(call.Arguments) == 0 {
 			return false
 		}
 		arg, ok := call.Arguments[0].(*ast.StringNode)
@@ -187,12 +234,44 @@ func VideoSecondsPaths(exprStr string) ([]string, error) {
 			return false
 		}
 		path := strings.TrimSpace(arg.Value)
-		if path != "" && !seen[path] {
-			seen[path] = true
-			paths = append(paths, path)
+		if path == "" {
+			return false
 		}
+		maxSeconds := 0.0
+		if len(call.Arguments) >= 2 {
+			limit, literal := numberLiteral(call.Arguments[1])
+			if !literal || limit <= 0 || math.IsNaN(limit) || math.IsInf(limit, 0) {
+				specErr = fmt.Errorf("video_seconds limit must be a positive numeric literal")
+				return false
+			}
+			maxSeconds = limit
+		}
+		if i, seen := index[path]; seen {
+			if maxSeconds > 0 && (specs[i].MaxSeconds == 0 || maxSeconds < specs[i].MaxSeconds) {
+				specs[i].MaxSeconds = maxSeconds
+			}
+			return false
+		}
+		index[path] = len(specs)
+		specs = append(specs, VideoSecondsSpec{Path: path, MaxSeconds: maxSeconds})
 		return false
 	})
+	if specErr != nil {
+		return nil, specErr
+	}
+	return specs, nil
+}
+
+// VideoSecondsPaths returns only the paths of VideoSecondsSpecs.
+func VideoSecondsPaths(exprStr string) ([]string, error) {
+	specs, err := VideoSecondsSpecs(exprStr)
+	if err != nil {
+		return nil, err
+	}
+	paths := make([]string, 0, len(specs))
+	for _, spec := range specs {
+		paths = append(paths, spec.Path)
+	}
 	return paths, nil
 }
 

@@ -5284,6 +5284,7 @@
     "Explain how this model is billed, e.g. ¥0.18 per second of output plus reference video length.": "說明該模型如何計費，例如：每秒 ¥0.18，按輸出時長加參考影片時長計費。",
     "incl. reference video": "含參考影片",
     "Prices are adjusted by request conditions": "價格根據請求條件調整",
-    "Per call": "按次"
+    "Per call": "按次",
+    "Reference video duration ({{path}}, max {{max}}s)": "參考影片時長（{{path}}，最多 {{max}} 秒）"
   }
 }

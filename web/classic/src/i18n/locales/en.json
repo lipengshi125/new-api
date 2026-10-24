@@ -3858,6 +3858,7 @@
     "未含分组倍率": "before group ratio",
     "该模型采用动态计费，详情请联系管理员。": "This model uses dynamic pricing. Please contact the administrator for details.",
     "含参考视频": "incl. reference video",
-    "价格根据请求条件调整": "Prices are adjusted by request conditions"
+    "价格根据请求条件调整": "Prices are adjusted by request conditions",
+    "最多": "max"
   }
 }

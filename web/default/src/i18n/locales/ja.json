@@ -5284,6 +5284,7 @@
     "Explain how this model is billed, e.g. ¥0.18 per second of output plus reference video length.": "このモデルの課金方法を説明してください。例：出力 1 秒あたり ¥0.18、参照動画の長さも含めて課金。",
     "incl. reference video": "参照動画を含む",
     "Prices are adjusted by request conditions": "価格はリクエスト条件に応じて調整されます",
-    "Per call": "回数課金"
+    "Per call": "回数課金",
+    "Reference video duration ({{path}}, max {{max}}s)": "参照動画の長さ（{{path}}、最大 {{max}} 秒）"
   }
 }

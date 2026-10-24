@@ -48,6 +48,12 @@ function describeSecondsSource(
   t: (key: string, options?: Record<string, unknown>) => string
 ): string {
   if (source.kind === 'video') {
+    if (source.maxSeconds) {
+      return t('Reference video duration ({{path}}, max {{max}}s)', {
+        path: source.path,
+        max: source.maxSeconds,
+      })
+    }
     return t('Reference video duration ({{path}})', { path: source.path })
   }
   return t('Output duration ({{path}})', { path: source.path })

@@ -1521,7 +1521,7 @@ Important: len is NOT affected by auto-exclusion. Tier conditions should use len
 - header(name) — reads a request header
 - param(path) — reads a request body JSON path (gjson syntax)
 - has(source, substr) — substring check
-- video_seconds(path) — async task models only: total duration in seconds of the MP4/MOV video URLs at the request body path (the gateway downloads them to read the duration; capped at 3600). Example: video_seconds("videos")
+- video_seconds(path[, max]) — async task models only: total duration in whole seconds of the MP4/MOV video URLs at the request body path (the gateway downloads them to read the duration; each video is rounded to whole seconds; capped at 3600). Optional max rejects the request with a 400 before any charge when the total exceeds it. Example: video_seconds("videos", 15)
 - hour(tz), minute(tz), weekday(tz), month(tz), day(tz) — time functions, tz is a timezone like "Asia/Shanghai"
 
 ### Price Coefficients

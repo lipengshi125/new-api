@@ -175,6 +175,60 @@ func TestModelPriceHelperTieredTaskMultipart(t *testing.T) {
 	assert.Equal(t, common.QuotaRound(0.18*1.75*4*common.QuotaPerUnit), priceData.Quota)
 }
 
+func TestModelPriceHelperTieredTaskVideoDurationLimit(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	saved := map[string]string{}
+	require.NoError(t, config.GlobalConfig.SaveToDB(func(key, value string) error {
+		saved[key] = value
+		return nil
+	}))
+	t.Cleanup(func() {
+		require.NoError(t, config.GlobalConfig.LoadFromDB(saved))
+	})
+	exprJSON, err := common.Marshal(map[string]string{
+		"task-video-limited": `tier("base", 27000 * (max(0, min(30, float(param("duration") ?? 0))) + video_seconds("videos", 15)))`,
+	})
+	require.NoError(t, err)
+	require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{
+		"billing_setting.billing_mode":    `{"task-video-limited":"tiered_expr"}`,
+		"billing_setting.billing_expr":    string(exprJSON),
+		"group_ratio_setting.group_ratio": `{"default":1}`,
+	}))
+
+	run := func(videos ...string) (int, error) {
+		body := `{"duration":3,"videos":["` + strings.Join(videos, `","`) + `"]}`
+		req := httptest.NewRequest(http.MethodPost, "/v1/video/generations", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		ctx, info := newTaskExprContext(req, "default")
+		info.OriginModelName = "task-video-limited"
+		priceData, err := ModelPriceHelperTieredTask(ctx, info)
+		return priceData.Quota, err
+	}
+
+	t.Run("total at the limit is accepted", func(t *testing.T) {
+		quota, err := run(testMP4DataURL(10), testMP4DataURL(5))
+		require.NoError(t, err)
+		assert.Equal(t, common.QuotaRound(0.027*(3+15)*common.QuotaPerUnit), quota)
+	})
+
+	t.Run("total over the limit is rejected before any charge", func(t *testing.T) {
+		quota, err := run(testMP4DataURL(10), testMP4DataURL(8))
+		var limitErr *VideoDurationLimitError
+		require.ErrorAs(t, err, &limitErr)
+		assert.Equal(t, 18.0, limitErr.Seconds)
+		assert.Equal(t, 15.0, limitErr.MaxSeconds)
+		assert.Zero(t, quota, "no quota must be computed for a rejected request")
+		assert.Contains(t, err.Error(), "15")
+	})
+
+	t.Run("single long video is rejected", func(t *testing.T) {
+		_, err := run(testMP4DataURL(16))
+		var limitErr *VideoDurationLimitError
+		require.ErrorAs(t, err, &limitErr)
+	})
+}
+
 func TestModelPriceHelperTieredTaskFixedPrice(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

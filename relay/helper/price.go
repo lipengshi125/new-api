@@ -284,10 +284,11 @@ func ModelPriceHelperTieredTask(c *gin.Context, info *relaycommon.RelayInfo) (ty
 		}
 	}
 
-	// video_seconds("videos")：探测请求中视频 URL 的真实时长后再求值（可能较慢）。
+	// video_seconds("videos"[, max])：探测请求中视频 URL 的真实时长后再求值（可能较慢）。
 	// 探测失败直接拒绝请求，避免读不到时长时按 0 秒少扣费。
+	// 总时长超过 max 时同样拒绝：此时尚未预扣费，无需退款，也不会请求上游。
 	// 只保留探测出的秒数（重试时复用），下载的视频数据在探测结束后即释放。
-	videoPaths, err := billingexpr.VideoSecondsPaths(exprStr)
+	videoSpecs, err := billingexpr.VideoSecondsSpecs(exprStr)
 	if err != nil {
 		return types.PriceData{}, fmt.Errorf("model %s tiered expr compile failed: %w", info.OriginModelName, err)
 	}
@@ -295,24 +296,24 @@ func ModelPriceHelperTieredTask(c *gin.Context, info *relaycommon.RelayInfo) (ty
 		requestInput.MediaSeconds = info.TaskExprBilling.MediaSeconds
 	}
 	if requestInput.MediaSeconds == nil {
-		requestInput.MediaSeconds = make(map[string]float64, len(videoPaths))
+		requestInput.MediaSeconds = make(map[string]float64, len(videoSpecs))
 	}
 	inputSeconds := 0.0
-	for _, path := range videoPaths {
-		if seconds, probed := requestInput.MediaSeconds[path]; probed {
-			inputSeconds += seconds
-			continue
-		}
-		urls := requestStringList(requestInput.Body, path)
-		seconds := 0.0
-		if len(urls) > 0 {
-			var probeErr error
-			if seconds, probeErr = service.ProbeVideoURLsSeconds(c.Request.Context(), urls); probeErr != nil {
-				return types.PriceData{}, fmt.Errorf("%s: %w", path, probeErr)
+	for _, spec := range videoSpecs {
+		seconds, probed := requestInput.MediaSeconds[spec.Path]
+		if !probed {
+			if urls := requestStringList(requestInput.Body, spec.Path); len(urls) > 0 {
+				var probeErr error
+				if seconds, probeErr = service.ProbeVideoURLsSeconds(c.Request.Context(), urls); probeErr != nil {
+					return types.PriceData{}, fmt.Errorf("%s: %w", spec.Path, probeErr)
+				}
+				logger.LogInfo(c, fmt.Sprintf("probed video duration for billing: %s=%d videos, %.2fs", spec.Path, len(urls), seconds))
 			}
-			logger.LogInfo(c, fmt.Sprintf("probed video duration for billing: %s=%d videos, %.2fs", path, len(urls), seconds))
+			requestInput.MediaSeconds[spec.Path] = seconds
 		}
-		requestInput.MediaSeconds[path] = seconds
+		if spec.MaxSeconds > 0 && seconds > spec.MaxSeconds {
+			return types.PriceData{}, &VideoDurationLimitError{Path: spec.Path, Seconds: seconds, MaxSeconds: spec.MaxSeconds}
+		}
 		inputSeconds += seconds
 	}
 
@@ -334,7 +335,7 @@ func ModelPriceHelperTieredTask(c *gin.Context, info *relaycommon.RelayInfo) (ty
 	info.TaskExprBilling = &relaycommon.TaskExprBilling{
 		UnitPrice:       unitPrice,
 		Unit:            unit,
-		HasInputSeconds: len(videoPaths) > 0,
+		HasInputSeconds: len(videoSpecs) > 0,
 		InputSeconds:    inputSeconds,
 		OutputSeconds:   outputSeconds,
 		Multipliers:     billingexpr.ExplainParamMultipliers(exprStr, requestInput),
@@ -366,6 +367,20 @@ func ModelPriceHelperTieredTask(c *gin.Context, info *relaycommon.RelayInfo) (ty
 		QuotaToPreConsume: quota,
 		GroupRatioInfo:    groupRatioInfo,
 	}, nil
+}
+
+// VideoDurationLimitError 参考视频总时长超过表达式中 video_seconds(path, max) 的上限。
+// 在价格计算阶段（预扣费之前）返回，因此不扣费也不需要退款。
+type VideoDurationLimitError struct {
+	Path       string
+	Seconds    float64
+	MaxSeconds float64
+}
+
+func (e *VideoDurationLimitError) Error() string {
+	return fmt.Sprintf(
+		"参考视频总时长 %.0f 秒，超过本模型上限 %.0f 秒，请缩短视频后重试 / Reference video total duration %.0fs exceeds model limit %.0fs; please use shorter videos",
+		e.Seconds, e.MaxSeconds, e.Seconds, e.MaxSeconds)
 }
 
 // requestStringList 读取请求体中的字符串或字符串数组（gjson 路径），忽略空值。

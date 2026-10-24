@@ -22,6 +22,40 @@ describe('parseTaskExprPricing', () => {
     })
   })
 
+  test('boolean and numeric parameter values are recognized', () => {
+    assert.deepEqual(
+      parseTaskExprPricing(
+        'tier("base", 50000 * max(0, min(3600, float(param("duration") ?? 0)))) * (param("sound") == true ? 1.35 : 1) * (param("resolution") == "1080p" ? 2 : 1)'
+      ),
+      {
+        unit: 'second',
+        unitPrice: 0.05,
+        secondsSources: [{ kind: 'param', path: 'duration' }],
+        multipliers: [
+          { name: 'sound', value: 'true', ratio: 1.35 },
+          { name: 'resolution', value: '1080p', ratio: 2 },
+        ],
+      }
+    )
+    assert.equal(
+      parseTaskExprPricing('tier("base", fixed(0.1)) * (param("n") == 2 ? 2 : 1)')
+        ?.multipliers[0].value,
+      '2'
+    )
+  })
+
+  test('reference video duration limit is recognized', () => {
+    assert.deepEqual(
+      parseTaskExprPricing(
+        '(tier("base", 27000 * (max(2, min(30, float(param("duration") ?? 0))) + video_seconds("videos", 15)))) * (param("resolution") == "720p" ? 1.75 : 1)'
+      )?.secondsSources,
+      [
+        { kind: 'param', path: 'duration' },
+        { kind: 'video', path: 'videos', maxSeconds: 15 },
+      ]
+    )
+  })
+
   test('expression saved by the editor with wrapped base is equivalent', () => {
     const saved = VIDEO_EXPR.replace(/^(tier\([\s\S]+?\)\)\)) \*/, '($1) *')
     assert.notEqual(saved, VIDEO_EXPR)

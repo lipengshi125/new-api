@@ -5284,6 +5284,7 @@
     "Explain how this model is billed, e.g. ¥0.18 per second of output plus reference video length.": "Опишите, как тарифицируется модель, например: ¥0,18 за секунду вывода плюс длительность референсного видео.",
     "incl. reference video": "с референсным видео",
     "Prices are adjusted by request conditions": "Цены корректируются в зависимости от условий запроса",
-    "Per call": "За вызов"
+    "Per call": "За вызов",
+    "Reference video duration ({{path}}, max {{max}}s)": "Длительность референсного видео ({{path}}, не более {{max}} с)"
   }
 }

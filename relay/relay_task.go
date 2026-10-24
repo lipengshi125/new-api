@@ -189,6 +189,10 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 	if isTieredExpr {
 		priceData, err := helper.ModelPriceHelperTieredTask(c, info)
 		if err != nil {
+			var limitErr *helper.VideoDurationLimitError
+			if errors.As(err, &limitErr) {
+				return nil, service.TaskErrorWrapperLocal(err, "video_duration_exceeded", http.StatusBadRequest)
+			}
 			return nil, service.TaskErrorWrapperLocal(err, "model_price_error", http.StatusBadRequest)
 		}
 		info.PriceData = priceData

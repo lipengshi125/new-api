@@ -5284,6 +5284,7 @@
     "Explain how this model is billed, e.g. ¥0.18 per second of output plus reference video length.": "Giải thích cách tính phí của mô hình, ví dụ: ¥0,18 mỗi giây đầu ra cộng thời lượng video tham chiếu.",
     "incl. reference video": "gồm video tham chiếu",
     "Prices are adjusted by request conditions": "Giá được điều chỉnh theo điều kiện yêu cầu",
-    "Per call": "Theo lượt"
+    "Per call": "Theo lượt",
+    "Reference video duration ({{path}}, max {{max}}s)": "Thời lượng video tham chiếu ({{path}}, tối đa {{max}} giây)"
   }
 }

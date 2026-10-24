@@ -5284,6 +5284,7 @@
     "Explain how this model is billed, e.g. ¥0.18 per second of output plus reference video length.": "Expliquez comment ce modèle est facturé, ex. ¥0,18 par seconde de sortie plus la durée de la vidéo de référence.",
     "incl. reference video": "vidéo de référence incluse",
     "Prices are adjusted by request conditions": "Les prix sont ajustés selon les conditions de la requête",
-    "Per call": "Par appel"
+    "Per call": "Par appel",
+    "Reference video duration ({{path}}, max {{max}}s)": "Durée de la vidéo de référence ({{path}}, max {{max}} s)"
   }
 }
