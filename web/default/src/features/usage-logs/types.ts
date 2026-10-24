@@ -239,6 +239,8 @@ export interface LogOtherData {
   task_expr?: {
     input_seconds?: number
     output_seconds?: number
+    unit_price?: number
+    unit?: string
     multipliers?: Array<{
       name: string
       value?: string

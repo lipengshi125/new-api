@@ -91,6 +91,9 @@ function describeGroup(group, t) {
   return parts.join(' && ');
 }
 
+// 基础价格数字使用金黄色突出显示
+const BASE_PRICE_COLOR = 'var(--semi-color-warning)';
+
 function SectionHeader({ title, subtitle }) {
   return (
     <div className='flex items-center mb-4'>
@@ -191,9 +194,12 @@ function TaskExprDetails({ pricing, modelData, t }) {
         </div>
         <div style={rowStyle}>
           <span className='text-gray-500'>{t('基础价格')}</span>
-          <Text strong>
-            {fmt(pricing.unitPrice)} / {unitLabel}
-          </Text>
+          <span>
+            <Text strong style={{ color: BASE_PRICE_COLOR }}>
+              {fmt(pricing.unitPrice)}
+            </Text>
+            <span className='text-gray-500'> / {unitLabel}</span>
+          </span>
         </div>
         {isSecond && (
           <div style={rowStyle}>
@@ -382,10 +388,12 @@ export default function DynamicPricingBreakdown({ billingExpr, modelData, t }) {
               style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}
             >
               <span className='text-gray-500'>{t(label)}</span>
-              <Text strong>
-                {`${symbol}${Number((tiers[0][field] * rate).toFixed(4))}`}
+              <span>
+                <Text strong style={{ color: BASE_PRICE_COLOR }}>
+                  {`${symbol}${Number((tiers[0][field] * rate).toFixed(4))}`}
+                </Text>
                 <span className='text-xs text-gray-500 font-normal'> / 1M tokens</span>
-              </Text>
+              </span>
             </div>
           ))}
         </div>

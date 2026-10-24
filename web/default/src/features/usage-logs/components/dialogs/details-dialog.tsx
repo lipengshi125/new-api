@@ -216,9 +216,16 @@ function BillingBreakdown(props: {
 
   const taskExpr = other.task_expr
   if (taskExpr) {
-    // 任务表达式计费：秒数 → 参数倍率 → 分组倍率 → 总费用
+    // 任务表达式计费：基础价格 → 秒数 → 参数倍率 → 分组倍率 → 总费用
     rows.push({ label: t('Billing Mode'), value: t('Dynamic Pricing') })
     const outputSeconds = taskExpr.output_seconds ?? 0
+    if (taskExpr.unit_price != null && taskExpr.unit_price > 0) {
+      const unitLabel = taskExpr.unit === 'second' ? t('sec') : t('request')
+      rows.push({
+        label: t('Base Price'),
+        value: `${fmtPrice(taskExpr.unit_price)} / ${unitLabel}`,
+      })
+    }
     if (taskExpr.input_seconds != null) {
       rows.push({
         label: t('Input Seconds'),

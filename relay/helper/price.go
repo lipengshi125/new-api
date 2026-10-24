@@ -330,7 +330,10 @@ func ModelPriceHelperTieredTask(c *gin.Context, info *relaycommon.RelayInfo) (ty
 		outputSeconds = gjson.GetBytes(requestInput.Body, "seconds").Float()
 	}
 	outputSeconds = max(0, min(float64(relaycommon.MaxTaskDurationSeconds), outputSeconds))
+	unitPrice, unit, _ := billingexpr.ExplainUnitPrice(exprStr)
 	info.TaskExprBilling = &relaycommon.TaskExprBilling{
+		UnitPrice:       unitPrice,
+		Unit:            unit,
 		HasInputSeconds: len(videoPaths) > 0,
 		InputSeconds:    inputSeconds,
 		OutputSeconds:   outputSeconds,

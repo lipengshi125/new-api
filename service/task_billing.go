@@ -101,6 +101,10 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 			"output_seconds": exprBilling.OutputSeconds,
 			"multipliers":    exprBilling.Multipliers,
 		}
+		if exprBilling.UnitPrice > 0 {
+			taskExpr["unit_price"] = exprBilling.UnitPrice
+			taskExpr["unit"] = exprBilling.Unit
+		}
 		if exprBilling.HasInputSeconds {
 			taskExpr["input_seconds"] = exprBilling.InputSeconds
 		}

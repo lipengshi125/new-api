@@ -695,10 +695,14 @@ type TaskRelayInfo struct {
 
 // TaskExprBilling 异步任务表达式计费的展示明细
 type TaskExprBilling struct {
-	HasInputSeconds bool                          // 表达式是否使用了 video_seconds()
-	InputSeconds    float64                       // 参考视频总时长（探测得到）
-	OutputSeconds   float64                       // 请求的 duration/seconds 参数
-	Multipliers     []billingexpr.ParamMultiplier // 参数倍率
+	HasInputSeconds bool    // 表达式是否使用了 video_seconds()
+	InputSeconds    float64 // 参考视频总时长（探测得到）
+	OutputSeconds   float64 // 请求的 duration/seconds 参数
+	// UnitPrice 是表达式的基础单价（美元，不含参数倍率与分组倍率）；Unit 为 "second" 或 "request"。
+	// 无法从表达式结构识别出单价时为 0，日志中不展示基础价格。
+	UnitPrice   float64
+	Unit        string
+	Multipliers []billingexpr.ParamMultiplier // 参数倍率
 	// MediaSeconds 是各 video_seconds(path) 的探测结果，渠道重试时复用，避免重复下载
 	MediaSeconds map[string]float64
 }

@@ -674,7 +674,7 @@ function PriceSection(props: {
                 <div className='text-muted-foreground text-xs'>
                   {t(entry.shortLabel)}
                 </div>
-                <div className='text-foreground mt-1 font-mono text-base font-semibold tabular-nums'>
+                <div className='mt-1 font-mono text-base font-semibold text-amber-600 tabular-nums dark:text-amber-400'>
                   {entry.formatted}
                   <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
                     / {tokenUnitLabel}
@@ -699,7 +699,7 @@ function PriceSection(props: {
                   <span className='text-muted-foreground/70 text-sm'>
                     {t(entry.shortLabel)}
                   </span>
-                  <span className='text-muted-foreground font-mono text-sm tabular-nums'>
+                  <span className='font-mono text-sm text-amber-600/90 tabular-nums dark:text-amber-400/90'>
                     {entry.formatted}
                     <span className='text-muted-foreground/40 ml-1 text-xs font-normal'>
                       / {tokenUnitLabel}
@@ -724,7 +724,7 @@ function PriceSection(props: {
               ? t('Per second')
               : t('Per request')}
           </span>
-          <span className='text-foreground font-mono text-sm font-semibold tabular-nums'>
+          <span className='font-mono text-sm font-semibold text-amber-600 tabular-nums dark:text-amber-400'>
             {formatFixedPrice(
               props.model,
               baseGroupKey,
@@ -765,7 +765,7 @@ function PriceSection(props: {
         {primaryPriceTypes.map((item) => (
           <div key={item.type} className='bg-muted/20 rounded-lg border p-3'>
             <div className='text-muted-foreground text-xs'>{item.label}</div>
-            <div className='text-foreground mt-1 font-mono text-base font-semibold tabular-nums'>
+            <div className='mt-1 font-mono text-base font-semibold text-amber-600 tabular-nums dark:text-amber-400'>
               {renderPrice(item.type)}
             </div>
           </div>
@@ -782,7 +782,7 @@ function PriceSection(props: {
                 <span className='text-muted-foreground/70 text-sm'>
                   {item.label}
                 </span>
-                <span className='text-muted-foreground font-mono text-sm tabular-nums'>
+                <span className='font-mono text-sm text-amber-600/90 tabular-nums dark:text-amber-400/90'>
                   {renderPrice(item.type)}
                 </span>
               </div>

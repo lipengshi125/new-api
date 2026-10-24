@@ -77,6 +77,83 @@ func ExplainParamMultipliers(exprStr string, request RequestInput) []ParamMultip
 	return result
 }
 
+// ExplainUnitPrice 从表达式的 tier 叶子读出基础单价（美元，不含参数倍率与分组倍率），
+// 用于在日志中展示「基础价格」。识别的写法：
+//   - tier("x", fixed(A))           → 按次，单价 A
+//   - tier("x", K)                  → 按次，单价 K/1e6
+//   - tier("x", K * (秒数项...))    → 按秒，单价 K/1e6
+//
+// 只看结构不求值；识别不了（如多档位或 token 计费）时返回 ok=false。
+func ExplainUnitPrice(exprStr string) (unitPrice float64, unit string, ok bool) {
+	tree, err := parseExprTree(exprStr)
+	if err != nil {
+		return 0, "", false
+	}
+	var factors []ast.Node
+	collectMultiplyFactors(tree, &factors)
+
+	var leaf *ast.CallNode
+	for _, factor := range factors {
+		call, isCall := factor.(*ast.CallNode)
+		if !isCall {
+			continue
+		}
+		callee, isIdent := call.Callee.(*ast.IdentifierNode)
+		if !isIdent || callee.Value != "tier" || len(call.Arguments) != 2 {
+			continue
+		}
+		if leaf != nil {
+			return 0, "", false // 多个 tier 叶子，基础价格不唯一
+		}
+		leaf = call
+	}
+	if leaf == nil {
+		return 0, "", false
+	}
+
+	price := leaf.Arguments[1]
+	if fixedCall, isCall := price.(*ast.CallNode); isCall {
+		if callee, isIdent := fixedCall.Callee.(*ast.IdentifierNode); isIdent && callee.Value == "fixed" && len(fixedCall.Arguments) == 1 {
+			if amount, literal := numberLiteral(fixedCall.Arguments[0]); literal {
+				return amount, "request", true
+			}
+		}
+		return 0, "", false
+	}
+	if coef, literal := numberLiteral(price); literal {
+		return coef / 1_000_000, "request", true
+	}
+	if bin, isBin := price.(*ast.BinaryNode); isBin && bin.Operator == "*" {
+		coef, literal := numberLiteral(bin.Left)
+		if literal && !containsTokenVar(bin.Right) && usesSecondsSource(bin.Right) {
+			return coef / 1_000_000, "second", true
+		}
+	}
+	return 0, "", false
+}
+
+func containsTokenVar(node ast.Node) bool {
+	return ast.Find(node, func(part ast.Node) bool {
+		identifier, ok := part.(*ast.IdentifierNode)
+		if !ok {
+			return false
+		}
+		switch identifier.Value {
+		case "p", "c", "len", "cr", "cc", "cc1h", "img", "img_o", "ai", "ao":
+			return true
+		}
+		return false
+	}) != nil
+}
+
+// usesSecondsSource 判断秒数部分是否读取了请求参数或视频时长
+func usesSecondsSource(node ast.Node) bool {
+	return ast.Find(node, func(part ast.Node) bool {
+		identifier, ok := part.(*ast.IdentifierNode)
+		return ok && (identifier.Value == "param" || identifier.Value == "video_seconds")
+	}) != nil
+}
+
 func collectMultiplyFactors(node ast.Node, factors *[]ast.Node) {
 	if bin, ok := node.(*ast.BinaryNode); ok && bin.Operator == "*" {
 		collectMultiplyFactors(bin.Left, factors)

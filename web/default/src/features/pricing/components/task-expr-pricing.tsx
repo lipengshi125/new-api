@@ -135,7 +135,7 @@ export function TaskExprPricingDetails(
         </div>
         <div className={rowClass}>
           <span className='text-muted-foreground'>{t('Base Price')}</span>
-          <span className='font-mono font-semibold tabular-nums'>
+          <span className='font-mono font-semibold text-amber-600 tabular-nums dark:text-amber-400'>
             {unitPrice}
             <span className='text-muted-foreground ml-1 text-xs font-normal'>
               / {unitLabel}
