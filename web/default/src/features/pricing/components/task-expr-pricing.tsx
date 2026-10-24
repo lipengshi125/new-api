@@ -96,9 +96,9 @@ export function TaskExprPricingDetails(
   }
   formulaParts.push(t('group ratio'))
 
-  // 示例：输出 20 秒（有参考视频时再加 10 秒），使用倍率最高的参数值
-  const exampleOutput = 20
-  const exampleVideo = hasVideo ? 10 : 0
+  // 示例：输出 5 秒（有参考视频时再加 5 秒），使用倍率最高的参数值
+  const exampleOutput = 5
+  const exampleVideo = hasVideo ? 5 : 0
   const exampleSeconds =
     pricing.unit === 'second' ? exampleOutput + exampleVideo : 1
   const exampleChoices = groups.map((group) => {
@@ -126,6 +126,18 @@ export function TaskExprPricingDetails(
       : []),
     ...exampleChoices.map((c) => `${c.name}=${c.value}`),
   ]
+  // 计算过程：单价 × 秒数 × 各参数倍率，例如 $0.05×5×2×1.35
+  const exampleSteps = [
+    unitPrice,
+    ...(pricing.unit === 'second'
+      ? [
+          hasVideo
+            ? `(${exampleVideo}+${exampleOutput})`
+            : String(exampleOutput),
+        ]
+      : []),
+    ...exampleChoices.map((c) => formatRatio(c.ratio)),
+  ].join('×')
 
   const rowClass =
     'grid grid-cols-[7rem_minmax(0,1fr)] gap-3 py-1.5 text-sm sm:grid-cols-[8rem_minmax(0,1fr)]'
@@ -222,6 +234,10 @@ export function TaskExprPricingDetails(
           <span className='text-muted-foreground'>{t('Example')}：</span>
           {exampleConditions.join('，')}
           {exampleConditions.length > 0 && ' → '}
+          <span className='text-muted-foreground font-mono'>
+            {exampleSteps}
+          </span>
+          {' → '}
           <span className='font-mono font-semibold'>{examplePrice}</span>
           <span className='text-muted-foreground text-xs'>
             {' '}

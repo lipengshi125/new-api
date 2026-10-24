@@ -157,8 +157,8 @@ function TaskExprDetails({ pricing, modelData, t }) {
     t('分组倍率'),
   ].join(' × ');
 
-  const exampleOutput = 20;
-  const exampleVideo = hasVideo ? 10 : 0;
+  const exampleOutput = 5;
+  const exampleVideo = hasVideo ? 5 : 0;
   const exampleSeconds = isSecond ? exampleOutput + exampleVideo : 1;
   const choices = groups.map((g) => {
     const top = [...g.rows].sort((a, b) => b.ratio - a.ratio)[0];
@@ -175,6 +175,14 @@ function TaskExprDetails({ pricing, modelData, t }) {
       : []),
     ...choices.map((c) => `${c.name}=${c.value}`),
   ];
+  // 计算过程：单价 × 秒数 × 各参数倍率，例如 $0.05×5×2×1.35
+  const exampleSteps = [
+    fmt(pricing.unitPrice),
+    ...(isSecond
+      ? [hasVideo ? `(${exampleVideo}+${exampleOutput})` : String(exampleOutput)]
+      : []),
+    ...choices.map((c) => String(Number(c.ratio.toFixed(4)))),
+  ].join('×');
 
   const rowStyle = {
     display: 'grid',
@@ -284,6 +292,8 @@ function TaskExprDetails({ pricing, modelData, t }) {
           <span className='text-gray-500'>{t('示例')}：</span>
           {exampleConditions.join('，')}
           {exampleConditions.length > 0 && ' → '}
+          <span className='font-mono text-gray-500'>{exampleSteps}</span>
+          {' → '}
           <Text strong>{fmt(pricing.unitPrice * exampleSeconds * exampleMultiplier)}</Text>
           <span className='text-xs text-gray-500'> （{t('未含分组倍率')}）</span>
         </div>
