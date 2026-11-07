@@ -700,7 +700,7 @@ func backfillTaskModelAndTokenNames() {
 		return
 	}
 	var marker Option
-	if err := DB.Where("`key` = ?", taskNameBackfillOptionKey).First(&marker).Error; err == nil {
+	if err := DB.Where(commonKeyCol+" = ?", taskNameBackfillOptionKey).First(&marker).Error; err == nil {
 		return
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		// 读标记失败时不要贸然全表扫描，下次启动再试
