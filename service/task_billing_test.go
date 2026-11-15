@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"math"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/gin-gonic/gin"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -816,4 +819,65 @@ func TestSettle_NonPerCallBilling_AppliesAdaptorAdjustment(t *testing.T) {
 	log := getLastLog(t)
 	require.NotNil(t, log)
 	assert.Equal(t, model.LogTypeRefund, log.Type)
+}
+
+// TestLogTaskConsumption_ExprSecondsDisplay pins the consume-log text for
+// expression-billed tasks: output seconds appear only when the request carried
+// duration/seconds, so input-only models (e.g. watermark removal billed by
+// video_seconds) do not show a misleading "输出 0秒".
+func TestLogTaskConsumption_ExprSecondsDisplay(t *testing.T) {
+	tests := []struct {
+		name        string
+		billing     relaycommon.TaskExprBilling
+		wantContent string
+		wantOutput  bool
+	}{
+		{
+			name:        "input only",
+			billing:     relaycommon.TaskExprBilling{HasInputSeconds: true, InputSeconds: 3},
+			wantContent: "操作 textGenerate，表达式计费：输入 3秒",
+		},
+		{
+			name:        "output only",
+			billing:     relaycommon.TaskExprBilling{HasOutputSeconds: true, OutputSeconds: 5},
+			wantContent: "操作 textGenerate，表达式计费：输出 5秒",
+			wantOutput:  true,
+		},
+		{
+			name:        "input and output",
+			billing:     relaycommon.TaskExprBilling{HasInputSeconds: true, InputSeconds: 3, HasOutputSeconds: true, OutputSeconds: 5},
+			wantContent: "操作 textGenerate，表达式计费：输入 3秒 + 输出 5秒 = 8秒",
+			wantOutput:  true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			truncate(t)
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", nil)
+
+			billing := tt.billing
+			info := &relaycommon.RelayInfo{
+				UserId:          1,
+				OriginModelName: "remove_watermark",
+				TaskExprBilling: &billing,
+				TaskRelayInfo:   &relaycommon.TaskRelayInfo{Action: "textGenerate"},
+				ChannelMeta:     &relaycommon.ChannelMeta{},
+			}
+
+			LogTaskConsumption(c, info)
+
+			log := getLastLog(t)
+			require.NotNil(t, log)
+			assert.Equal(t, tt.wantContent, log.Content)
+
+			var other map[string]any
+			require.NoError(t, common.UnmarshalJsonStr(log.Other, &other))
+			taskExpr, ok := other["task_expr"].(map[string]any)
+			require.True(t, ok)
+			_, hasOutput := taskExpr["output_seconds"]
+			assert.Equal(t, tt.wantOutput, hasOutput)
+		})
+	}
 }

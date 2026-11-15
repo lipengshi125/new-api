@@ -325,21 +325,27 @@ func ModelPriceHelperTieredTask(c *gin.Context, info *relaycommon.RelayInfo) (ty
 		return types.PriceData{}, fmt.Errorf("model %s tiered expr produced invalid cost %v", info.OriginModelName, rawCost)
 	}
 
-	// 输出秒数直接读取用户请求的 duration（兼容 seconds），仅用于日志展示，钳制到 0~3600
-	outputSeconds := gjson.GetBytes(requestInput.Body, "duration").Float()
-	if outputSeconds == 0 {
-		outputSeconds = gjson.GetBytes(requestInput.Body, "seconds").Float()
+	// 输出秒数直接读取用户请求的 duration（兼容 seconds），仅用于日志展示，钳制到 0~3600。
+	// 请求体里两个字段都没有时，HasOutputSeconds 为 false，日志不展示"输出 0秒"这类无意义文案。
+	durationField := gjson.GetBytes(requestInput.Body, "duration")
+	hasOutputSeconds := durationField.Exists()
+	outputSeconds := durationField.Float()
+	if !hasOutputSeconds {
+		secondsField := gjson.GetBytes(requestInput.Body, "seconds")
+		hasOutputSeconds = secondsField.Exists()
+		outputSeconds = secondsField.Float()
 	}
 	outputSeconds = max(0, min(float64(relaycommon.MaxTaskDurationSeconds), outputSeconds))
 	unitPrice, unit, _ := billingexpr.ExplainUnitPrice(exprStr)
 	info.TaskExprBilling = &relaycommon.TaskExprBilling{
-		UnitPrice:       unitPrice,
-		Unit:            unit,
-		HasInputSeconds: len(videoSpecs) > 0,
-		InputSeconds:    inputSeconds,
-		OutputSeconds:   outputSeconds,
-		Multipliers:     billingexpr.ExplainParamMultipliers(exprStr, requestInput),
-		MediaSeconds:    requestInput.MediaSeconds,
+		UnitPrice:        unitPrice,
+		Unit:             unit,
+		HasInputSeconds:  len(videoSpecs) > 0,
+		InputSeconds:     inputSeconds,
+		HasOutputSeconds: hasOutputSeconds,
+		OutputSeconds:    outputSeconds,
+		Multipliers:      billingexpr.ExplainParamMultipliers(exprStr, requestInput),
+		MediaSeconds:     requestInput.MediaSeconds,
 	}
 
 	// 表达式系数是 $/1M 单价，与同步表达式计费、按次计费使用同一换算

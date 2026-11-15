@@ -697,7 +697,9 @@ type TaskRelayInfo struct {
 type TaskExprBilling struct {
 	HasInputSeconds bool    // 表达式是否使用了 video_seconds()
 	InputSeconds    float64 // 参考视频总时长（探测得到）
-	OutputSeconds   float64 // 请求的 duration/seconds 参数
+	// HasOutputSeconds 表示请求体是否携带了 duration/seconds；为 false 时日志不展示输出秒数
+	HasOutputSeconds bool
+	OutputSeconds    float64 // 请求的 duration/seconds 参数
 	// UnitPrice 是表达式的基础单价（美元，不含参数倍率与分组倍率）；Unit 为 "second" 或 "request"。
 	// 无法从表达式结构识别出单价时为 0，日志中不展示基础价格。
 	UnitPrice   float64

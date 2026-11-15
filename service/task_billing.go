@@ -30,12 +30,18 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 		formatSeconds := func(v float64) string {
 			return strconv.FormatFloat(math.Round(v*100)/100, 'f', -1, 64) + "秒"
 		}
-		parts := []string{"输出 " + formatSeconds(exprBilling.OutputSeconds)}
-		if exprBilling.HasInputSeconds {
+		// 请求没带 duration/seconds 时不展示输出秒数，只按输入秒数展示
+		var parts []string
+		switch {
+		case exprBilling.HasInputSeconds && exprBilling.HasOutputSeconds:
 			parts = []string{fmt.Sprintf("输入 %s + 输出 %s = %s",
 				formatSeconds(exprBilling.InputSeconds),
 				formatSeconds(exprBilling.OutputSeconds),
 				formatSeconds(exprBilling.InputSeconds+exprBilling.OutputSeconds))}
+		case exprBilling.HasInputSeconds:
+			parts = []string{"输入 " + formatSeconds(exprBilling.InputSeconds)}
+		case exprBilling.HasOutputSeconds:
+			parts = []string{"输出 " + formatSeconds(exprBilling.OutputSeconds)}
 		}
 		for _, m := range exprBilling.Multipliers {
 			value := m.Value
@@ -98,8 +104,10 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 	}
 	if exprBilling := info.TaskExprBilling; exprBilling != nil {
 		taskExpr := map[string]interface{}{
-			"output_seconds": exprBilling.OutputSeconds,
-			"multipliers":    exprBilling.Multipliers,
+			"multipliers": exprBilling.Multipliers,
+		}
+		if exprBilling.HasOutputSeconds {
+			taskExpr["output_seconds"] = exprBilling.OutputSeconds
 		}
 		if exprBilling.UnitPrice > 0 {
 			taskExpr["unit_price"] = exprBilling.UnitPrice

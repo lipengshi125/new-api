@@ -218,6 +218,7 @@ function BillingBreakdown(props: {
   if (taskExpr) {
     // 任务表达式计费：基础价格 → 秒数 → 参数倍率 → 分组倍率 → 总费用
     rows.push({ label: t('Billing Mode'), value: t('Dynamic Pricing') })
+    const hasOutputSeconds = taskExpr.output_seconds != null
     const outputSeconds = taskExpr.output_seconds ?? 0
     if (taskExpr.unit_price != null && taskExpr.unit_price > 0) {
       const unitLabel = taskExpr.unit === 'second' ? t('sec') : t('request')
@@ -232,8 +233,10 @@ function BillingBreakdown(props: {
         value: `${taskExpr.input_seconds}s`,
       })
     }
-    rows.push({ label: t('Output Seconds'), value: `${outputSeconds}s` })
-    if (taskExpr.input_seconds != null) {
+    if (hasOutputSeconds) {
+      rows.push({ label: t('Output Seconds'), value: `${outputSeconds}s` })
+    }
+    if (taskExpr.input_seconds != null && hasOutputSeconds) {
       rows.push({
         label: t('Billed Seconds'),
         value: `${taskExpr.input_seconds}s + ${outputSeconds}s = ${Number((taskExpr.input_seconds + outputSeconds).toFixed(2))}s`,
