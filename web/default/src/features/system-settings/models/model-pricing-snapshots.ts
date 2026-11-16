@@ -33,6 +33,7 @@ export type ModelPricingSnapshotInput = {
   billingMode: string
   billingExpr: string
   customRatios: string
+  customCharges?: string
   customRatioNotes?: string
   billingNotes?: string
 }
@@ -51,6 +52,7 @@ export type ModelPricingSnapshot = {
   billingExpr?: string
   requestRuleExpr?: string
   customRatios?: Record<string, Record<string, number>>
+  customCharges?: Record<string, Record<string, number>>
   customRatioNotes?: Record<string, Record<string, string>>
   billingNote?: string
   hasConflict: boolean
@@ -181,6 +183,7 @@ export const buildModelSnapshots = ({
   billingMode,
   billingExpr,
   customRatios,
+  customCharges,
   customRatioNotes,
   billingNotes,
 }: ModelPricingSnapshotInput): ModelPricingSnapshot[] => {
@@ -230,6 +233,12 @@ export const buildModelSnapshots = ({
     fallback: {},
     context: 'custom ratios',
   })
+  const customChargesMap = safeJsonParse<
+    Record<string, Record<string, Record<string, number>>>
+  >(customCharges || '{}', {
+    fallback: {},
+    context: 'custom charges',
+  })
   const customRatioNotesMap = safeJsonParse<
     Record<string, Record<string, Record<string, string>>>
   >(customRatioNotes || '{}', {
@@ -253,6 +262,7 @@ export const buildModelSnapshots = ({
     ...Object.keys(billingModeMap),
     ...Object.keys(billingExprMap),
     ...Object.keys(customRatiosMap),
+    ...Object.keys(customChargesMap),
   ])
 
   return Array.from(modelNames).map((name) => {
@@ -265,6 +275,7 @@ export const buildModelSnapshots = ({
     const audio = audioMap[name]?.toString() || ''
     const audioCompletion = audioCompletionMap[name]?.toString() || ''
     const modelCustomRatios = customRatiosMap[name]
+    const modelCustomCharges = customChargesMap[name]
     const modelCustomRatioNotes = customRatioNotesMap[name]
     const modelBillingNote = billingNotesMap[name]
 
@@ -287,6 +298,7 @@ export const buildModelSnapshots = ({
         audioRatio: audio,
         audioCompletionRatio: audioCompletion,
         customRatios: modelCustomRatios,
+        customCharges: modelCustomCharges,
         customRatioNotes: modelCustomRatioNotes,
         billingNote: modelBillingNote,
         hasConflict: false,
@@ -304,6 +316,7 @@ export const buildModelSnapshots = ({
       audioRatio: audio,
       audioCompletionRatio: audioCompletion,
       customRatios: modelCustomRatios,
+      customCharges: modelCustomCharges,
       customRatioNotes: modelCustomRatioNotes,
       billingNote: modelBillingNote,
       billingMode: price !== '' ? 'per-request' : 'per-token',
@@ -335,6 +348,7 @@ export const getSnapshotSignature = (snapshot?: ModelPricingSnapshot) => {
     billingExpr: snapshot.billingExpr || '',
     requestRuleExpr: snapshot.requestRuleExpr || '',
     customRatios: snapshot.customRatios || {},
+    customCharges: snapshot.customCharges || {},
     customRatioNotes: snapshot.customRatioNotes || {},
     billingNote: snapshot.billingNote || '',
   })

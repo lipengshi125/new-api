@@ -33,6 +33,7 @@ type Pricing struct {
 	AudioRatio             *float64                      `json:"audio_ratio,omitempty"`
 	AudioCompletionRatio   *float64                      `json:"audio_completion_ratio,omitempty"`
 	CustomRatios           map[string]map[string]float64 `json:"custom_ratios,omitempty"`
+	CustomCharges          map[string]map[string]float64 `json:"custom_charges,omitempty"`
 	CustomRatioNotes       map[string]map[string]string  `json:"custom_ratio_notes,omitempty"`
 	BillingNote            string                        `json:"billing_note,omitempty"`
 	EnableGroup            []string                      `json:"enable_groups"`
@@ -432,6 +433,9 @@ func updatePricing() {
 		pricing.BillingUnit = ratio_setting.GetBillingUnit(model)
 		if customRatios := ratio_setting.GetCustomRatios(model); customRatios != nil {
 			pricing.CustomRatios = customRatios
+		}
+		if customCharges := ratio_setting.GetCustomCharges(model); customCharges != nil {
+			pricing.CustomCharges = customCharges
 		}
 		// 参数倍率备注同时服务于自定义倍率和表达式中的参数条件，独立下发
 		pricing.CustomRatioNotes = ratio_setting.GetCustomRatioNotes(model)

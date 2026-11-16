@@ -40,6 +40,7 @@ const getModelDefaults = (settings: BillingSettings) => ({
   BillingExpr: settings['billing_setting.billing_expr'],
   ModelPriceUnit: settings.ModelPriceUnit,
   CustomRatios: settings.CustomRatios,
+  CustomCharges: settings.CustomCharges,
   CustomRatioNotes: settings.CustomRatioNotes,
   ModelBillingNotes: settings.ModelBillingNotes,
 })

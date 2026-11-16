@@ -118,6 +118,7 @@ const createModelSchema = (t: Translate) =>
     BillingExpr: createJsonStringField(t),
     ModelPriceUnit: createJsonStringField(t),
     CustomRatios: createJsonStringField(t),
+    CustomCharges: createJsonStringField(t),
     CustomRatioNotes: createJsonStringField(t),
     ModelBillingNotes: createJsonStringField(t),
   })
@@ -199,6 +200,7 @@ export function RatioSettingsCard({
     BillingExpr: normalizeJsonString(modelDefaults.BillingExpr),
     ModelPriceUnit: normalizeJsonString(modelDefaults.ModelPriceUnit),
     CustomRatios: normalizeJsonString(modelDefaults.CustomRatios),
+    CustomCharges: normalizeJsonString(modelDefaults.CustomCharges),
     CustomRatioNotes: normalizeJsonString(modelDefaults.CustomRatioNotes),
     ModelBillingNotes: normalizeJsonString(modelDefaults.ModelBillingNotes),
   })
@@ -239,6 +241,7 @@ export function RatioSettingsCard({
       BillingExpr: formatJsonForTextarea(modelDefaults.BillingExpr),
       ModelPriceUnit: formatJsonForTextarea(modelDefaults.ModelPriceUnit),
       CustomRatios: formatJsonForTextarea(modelDefaults.CustomRatios),
+      CustomCharges: formatJsonForTextarea(modelDefaults.CustomCharges),
       CustomRatioNotes: formatJsonForTextarea(modelDefaults.CustomRatioNotes),
       ModelBillingNotes: formatJsonForTextarea(modelDefaults.ModelBillingNotes),
     },
@@ -281,6 +284,7 @@ export function RatioSettingsCard({
     BillingExpr: normalizeJsonString(modelDefaults.BillingExpr),
     ModelPriceUnit: normalizeJsonString(modelDefaults.ModelPriceUnit),
     CustomRatios: normalizeJsonString(modelDefaults.CustomRatios),
+    CustomCharges: normalizeJsonString(modelDefaults.CustomCharges),
     CustomRatioNotes: normalizeJsonString(modelDefaults.CustomRatioNotes),
     ModelBillingNotes: normalizeJsonString(modelDefaults.ModelBillingNotes),
   })
@@ -305,6 +309,7 @@ export function RatioSettingsCard({
       BillingExpr: normalizeJsonString(currentDefaults.BillingExpr),
       ModelPriceUnit: normalizeJsonString(currentDefaults.ModelPriceUnit),
       CustomRatios: normalizeJsonString(currentDefaults.CustomRatios),
+      CustomCharges: normalizeJsonString(currentDefaults.CustomCharges),
       CustomRatioNotes: normalizeJsonString(currentDefaults.CustomRatioNotes),
       ModelBillingNotes: normalizeJsonString(currentDefaults.ModelBillingNotes),
     }
@@ -326,6 +331,7 @@ export function RatioSettingsCard({
       BillingExpr: formatJsonForTextarea(currentDefaults.BillingExpr),
       ModelPriceUnit: formatJsonForTextarea(currentDefaults.ModelPriceUnit),
       CustomRatios: formatJsonForTextarea(currentDefaults.CustomRatios),
+      CustomCharges: formatJsonForTextarea(currentDefaults.CustomCharges),
       CustomRatioNotes: formatJsonForTextarea(currentDefaults.CustomRatioNotes),
       ModelBillingNotes: formatJsonForTextarea(
         currentDefaults.ModelBillingNotes
@@ -391,6 +397,7 @@ export function RatioSettingsCard({
         BillingExpr: normalizeJsonString(values.BillingExpr),
         ModelPriceUnit: normalizeJsonString(values.ModelPriceUnit),
         CustomRatios: normalizeJsonString(values.CustomRatios),
+        CustomCharges: normalizeJsonString(values.CustomCharges),
         CustomRatioNotes: normalizeJsonString(values.CustomRatioNotes),
         ModelBillingNotes: normalizeJsonString(values.ModelBillingNotes),
       }

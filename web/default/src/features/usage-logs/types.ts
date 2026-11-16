@@ -233,7 +233,9 @@ export interface LogOtherData {
     name: string
     value?: string
     count?: number
-    ratio: number
+    ratio?: number
+    // 固定加价（美元），与 ratio 互斥
+    charge_usd?: number
   }>
   // Async task expression billing breakdown (consume logs)
   task_expr?: {

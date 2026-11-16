@@ -26,10 +26,14 @@ type PriceData struct {
 	AudioRatio           float64
 	AudioCompletionRatio float64
 	otherRatios          map[string]float64
-	UsePrice             bool
-	Quota                int // 按次计费的最终额度（MJ / Task）
-	QuotaToPreConsume    int // 按量计费的预消耗额度
-	GroupRatioInfo       GroupRatioInfo
+	// otherCharges 是附加的固定加价（单位：美元），与 otherRatios 完全独立：
+	// 倍率是乘法因子，加价是直接加到基础额度上的固定金额，两者绝不能混用同一条路径，
+	// 否则 "+0.5" 会被 OtherRatioMultiplier 之类的乘法逻辑误当成 "×0.5"。
+	otherCharges      map[string]float64
+	UsePrice          bool
+	Quota             int // 按次计费的最终额度（MJ / Task）
+	QuotaToPreConsume int // 按量计费的预消耗额度
+	GroupRatioInfo    GroupRatioInfo
 }
 
 func (p *PriceData) AddOtherRatio(key string, ratio float64) {
@@ -40,6 +44,70 @@ func (p *PriceData) AddOtherRatio(key string, ratio float64) {
 		p.otherRatios = make(map[string]float64)
 	}
 	p.otherRatios[key] = ratio
+}
+
+// AddOtherCharge records a flat USD surcharge (e.g. "+0.5 per video uploaded"),
+// kept entirely separate from otherRatios so it is never multiplied in by
+// OtherRatioMultiplier/ApplyOtherRatiosToFloat/ApplyOtherRatiosToDecimal.
+// Rejects non-positive, NaN, and +Inf amounts for the same overflow-safety
+// reason AddOtherRatio does.
+func (p *PriceData) AddOtherCharge(key string, amountUSD float64) {
+	if !isValidOtherRatio(amountUSD) {
+		return
+	}
+	if p.otherCharges == nil {
+		p.otherCharges = make(map[string]float64)
+	}
+	p.otherCharges[key] = amountUSD
+}
+
+// RemoveOtherCharge removes a previously recorded flat USD surcharge.
+func (p *PriceData) RemoveOtherCharge(key string) {
+	if p.otherCharges == nil {
+		return
+	}
+	delete(p.otherCharges, key)
+}
+
+// ReplaceOtherCharges resets all flat USD surcharges to the given map (same
+// shape/semantics as ReplaceOtherRatios, used when replaying a task's stored
+// billing context on retry/settlement). Returns true when at least one valid
+// charge survived.
+func (p *PriceData) ReplaceOtherCharges(charges map[string]float64) bool {
+	p.otherCharges = nil
+	for key, amountUSD := range charges {
+		p.AddOtherCharge(key, amountUSD)
+	}
+	return len(p.otherCharges) > 0
+}
+
+// OtherCharges returns a defensive copy of the recorded flat USD surcharges,
+// or nil if none are set.
+func (p *PriceData) OtherCharges() map[string]float64 {
+	if len(p.otherCharges) == 0 {
+		return nil
+	}
+	charges := make(map[string]float64, len(p.otherCharges))
+	for key, amountUSD := range p.otherCharges {
+		if isValidOtherRatio(amountUSD) {
+			charges[key] = amountUSD
+		}
+	}
+	if len(charges) == 0 {
+		return nil
+	}
+	return charges
+}
+
+// OtherChargesTotalUSD sums all recorded flat USD surcharges.
+func (p *PriceData) OtherChargesTotalUSD() float64 {
+	total := 0.0
+	for _, amountUSD := range p.otherCharges {
+		if isValidOtherRatio(amountUSD) {
+			total += amountUSD
+		}
+	}
+	return total
 }
 
 func (p *PriceData) RemoveOtherRatio(key string) {

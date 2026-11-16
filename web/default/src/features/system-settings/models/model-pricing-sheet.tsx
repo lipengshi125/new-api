@@ -166,6 +166,9 @@ export const ModelPricingEditorPanel = forwardRef<
   const [customRatios, setCustomRatios] = useState<
     Record<string, Record<string, number>>
   >({})
+  const [customCharges, setCustomCharges] = useState<
+    Record<string, Record<string, number>>
+  >({})
   const [customRatioNotes, setCustomRatioNotes] = useState<
     Record<string, Record<string, string>>
   >({})
@@ -213,6 +216,7 @@ export const ModelPricingEditorPanel = forwardRef<
       setRequestRuleExpr(editData.requestRuleExpr || '')
       setBillingUnit(editData.billingUnit || inferBillingUnit(editData.name))
       setCustomRatios(editData.customRatios ?? {})
+      setCustomCharges(editData.customCharges ?? {})
       setCustomRatioNotes(editData.customRatioNotes ?? {})
       setBillingNote(editData.billingNote ?? '')
     } else {
@@ -232,6 +236,7 @@ export const ModelPricingEditorPanel = forwardRef<
       setRequestRuleExpr('')
       setBillingUnit('request')
       setCustomRatios({})
+      setCustomCharges({})
       setCustomRatioNotes({})
       setBillingNote('')
     }
@@ -488,6 +493,7 @@ export const ModelPricingEditorPanel = forwardRef<
       // the editor expresses "the admin deleted every parameter row", and the
       // persist step needs to see that to drop the model's stored entry.
       data.customRatios = customRatios
+      data.customCharges = customCharges
       data.customRatioNotes = customRatioNotes
       data.billingNote = billingNote.trim()
 
@@ -499,6 +505,7 @@ export const ModelPricingEditorPanel = forwardRef<
       pricingMode,
       requestRuleExpr,
       customRatios,
+      customCharges,
       customRatioNotes,
       billingNote,
     ]
@@ -727,10 +734,12 @@ export const ModelPricingEditorPanel = forwardRef<
                   <div className='mt-6'>
                     <CustomRatiosTable
                       key={editorReloadToken}
-                      value={customRatios}
+                      ratios={customRatios}
+                      charges={customCharges}
                       notes={customRatioNotes}
-                      onChange={(ratios, notes) => {
+                      onChange={(ratios, charges, notes) => {
                         setCustomRatios(ratios)
+                        setCustomCharges(charges)
                         setCustomRatioNotes(notes)
                       }}
                     />

@@ -272,6 +272,7 @@ export type BillingSettings = {
   ExposeRatioEnabled: boolean
   ModelPriceUnit: string
   CustomRatios: string
+  CustomCharges: string
   CustomRatioNotes: string
   ModelBillingNotes: string
   'billing_setting.billing_mode': string

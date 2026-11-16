@@ -105,6 +105,11 @@ func newRuntimeEnv(params TokenParams, request RequestInput, trace *TraceResult)
 		"video_seconds": func(path string, _ ...float64) float64 {
 			return request.MediaSeconds[strings.TrimSpace(path)]
 		},
+		// item_count(path)：请求体 path 处的非空元素个数（数组取非空元素数，
+		// 非空标量计 1，缺失/空/null 为 0），封顶 MaxItemCount 防止超大数组放大计费。
+		// video_count 是同义别名，path 可以是 videos、images、audios 或嵌套路径。
+		"item_count":  func(path string) float64 { return requestItemCount(request.Body, path) },
+		"video_count": func(path string) float64 { return requestItemCount(request.Body, path) },
 		"has": func(source interface{}, substr string) bool {
 			if source == nil || substr == "" {
 				return false
@@ -122,6 +127,46 @@ func newRuntimeEnv(params TokenParams, request RequestInput, trace *TraceResult)
 		"ceil":  math.Ceil,
 		"floor": math.Floor,
 	}
+}
+
+// MaxItemCount 是 item_count/video_count 的计数上限（与自定义倍率「按个数」一致）。
+const MaxItemCount = 128
+
+func requestItemCount(body []byte, path string) float64 {
+	path = strings.TrimSpace(path)
+	if path == "" || len(body) == 0 {
+		return 0
+	}
+	result := gjson.GetBytes(body, path)
+	count := 0
+	switch {
+	case !result.Exists(), result.Type == gjson.Null:
+		return 0
+	case result.IsArray():
+		for _, item := range result.Array() {
+			if item.Type == gjson.Null {
+				continue
+			}
+			if item.Type == gjson.String && strings.TrimSpace(item.Str) == "" {
+				continue
+			}
+			if item.IsObject() && len(item.Map()) == 0 {
+				continue
+			}
+			count++
+		}
+	case result.Type == gjson.String:
+		if strings.TrimSpace(result.Str) != "" {
+			count = 1
+		}
+	case result.IsObject():
+		if len(result.Map()) > 0 {
+			count = 1
+		}
+	default:
+		count = 1
+	}
+	return float64(min(count, MaxItemCount))
 }
 
 func timeInZone(tz string) time.Time {

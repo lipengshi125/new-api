@@ -907,7 +907,9 @@ function RawExprEditor({ exprString, onChange }: RawExprEditorProps) {
             <code>fixed(amount)</code>, <code>max</code>, <code>min</code>,{' '}
             <code>ceil</code>, <code>floor</code>, <code>abs</code>,{' '}
             <code>header(name)</code>, <code>param(path)</code>,{' '}
-            <code>has(source, text)</code>, <code>video_seconds(path)</code>
+            <code>has(source, text)</code>, <code>video_seconds(path)</code>,
+            {' '}
+            <code>item_count(path)</code>
           </div>
         </AlertDescription>
       </Alert>
@@ -1522,6 +1524,7 @@ Important: len is NOT affected by auto-exclusion. Tier conditions should use len
 - param(path) — reads a request body JSON path (gjson syntax)
 - has(source, substr) — substring check
 - video_seconds(path[, max]) — async task models only: total duration in whole seconds of the MP4/MOV video URLs at the request body path (the gateway downloads them to read the duration; each video is rounded to whole seconds; capped at 3600). Optional max rejects the request with a 400 before any charge when the total exceeds it. Example: video_seconds("videos", 15)
+- item_count(path) — async task models only: number of non-empty items at a request body path (array length excluding empty/null entries; a non-empty scalar counts as 1; capped at 128). Works for any field: videos, images, audios or nested paths like input.images. video_count(path) is an alias. Use it additively for per-item charges, e.g. tier("base", 200000 + item_count("videos") * 500000) charges $0.5 per uploaded video on top of a $0.2 base
 - hour(tz), minute(tz), weekday(tz), month(tz), day(tz) — time functions, tz is a timezone like "Asia/Shanghai"
 
 ### Price Coefficients

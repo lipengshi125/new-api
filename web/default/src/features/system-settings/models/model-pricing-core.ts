@@ -86,6 +86,7 @@ export type ModelRatioData = {
   requestRuleExpr?: string
   billingUnit?: BillingUnit
   customRatios?: Record<string, Record<string, number>>
+  customCharges?: Record<string, Record<string, number>>
   // 自定义倍率备注（仅展示，不参与计费）：param_name -> param_value -> note
   customRatioNotes?: Record<string, Record<string, string>>
   // 计费说明（仅展示）：识别不了的表达式在模型广场只展示这段说明
@@ -335,6 +336,9 @@ export const CUSTOM_RATIO_MATCH_PER_ITEM = '*count'
 
 export type CustomRatioMatchMode = 'exact' | 'any' | 'per_item'
 
+// 参数计费模式：倍率（乘法因子）或固定加价（美元）
+export type CustomRatioValueMode = 'ratio' | 'charge'
+
 export function getCustomRatioMatchMode(
   paramValue: string
 ): CustomRatioMatchMode {
@@ -349,13 +353,16 @@ export type FlatRatioRow = {
   paramValue: string
   ratio: number
   note: string
+  valueMode: CustomRatioValueMode // 'ratio' = 倍率（×），'charge' = 固定加价（+$）
 }
 
 /**
- * 将嵌套的 customRatios 结构（及备注）转换为扁平的行数组，便于表格渲染
+ * 将嵌套的 customRatios/customCharges 结构（及备注）转换为扁平的行数组，便于表格渲染。
+ * 每个参数名只能出现在 ratios 或 charges 之一，不会同时出现（UI 强制互斥）。
  */
 export function flattenCustomRatios(
   ratios: Record<string, Record<string, number>>,
+  charges: Record<string, Record<string, number>> = {},
   notes: Record<string, Record<string, string>> = {}
 ): FlatRatioRow[] {
   const rows: FlatRatioRow[] = []
@@ -367,6 +374,19 @@ export function flattenCustomRatios(
         paramValue,
         ratio,
         note: notes[paramName]?.[paramValue] ?? '',
+        valueMode: 'ratio',
+      })
+    })
+  })
+  Object.entries(charges).forEach(([paramName, valueMap]) => {
+    Object.entries(valueMap).forEach(([paramValue, chargeUSD]) => {
+      rows.push({
+        id: `${paramName}::${paramValue}`,
+        paramName,
+        paramValue,
+        ratio: chargeUSD, // UI 复用 ratio 字段存储数值，valueMode 区分语义
+        note: notes[paramName]?.[paramValue] ?? '',
+        valueMode: 'charge',
       })
     })
   })
@@ -382,13 +402,15 @@ export function flattenCustomRatios(
 }
 
 /**
- * 将扁平的行数组转换回嵌套的 customRatios 结构与备注结构
+ * 将扁平的行数组转换回嵌套的 customRatios/customCharges 结构与备注结构
  */
 export function unflattenCustomRatios(rows: FlatRatioRow[]): {
   ratios: Record<string, Record<string, number>>
+  charges: Record<string, Record<string, number>>
   notes: Record<string, Record<string, string>>
 } {
   const ratios: Record<string, Record<string, number>> = {}
+  const charges: Record<string, Record<string, number>> = {}
   const notes: Record<string, Record<string, string>> = {}
   rows.forEach((row) => {
     // 跳过尚未填写完整或非法的行：空的参数名/参数值、以及非正/非有限的倍率
@@ -398,13 +420,20 @@ export function unflattenCustomRatios(rows: FlatRatioRow[]): {
     const val = row.paramValue.trim()
     if (!name || !val) return
     if (!Number.isFinite(row.ratio) || row.ratio <= 0) return
-    ratios[name] ??= {}
-    ratios[name][val] = row.ratio
+
+    if (row.valueMode === 'charge') {
+      charges[name] ??= {}
+      charges[name][val] = row.ratio
+    } else {
+      ratios[name] ??= {}
+      ratios[name][val] = row.ratio
+    }
+
     const note = row.note.trim()
     if (note) {
       notes[name] ??= {}
       notes[name][val] = note
     }
   })
-  return { ratios, notes }
+  return { ratios, charges, notes }
 }

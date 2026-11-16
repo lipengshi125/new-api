@@ -50,6 +50,7 @@ const defaultBillingSettings: BillingSettings = {
   ExposeRatioEnabled: false,
   ModelPriceUnit: '{}',
   CustomRatios: '{}',
+  CustomCharges: '{}',
   CustomRatioNotes: '{}',
   ModelBillingNotes: '{}',
   'billing_setting.billing_mode': '{}',

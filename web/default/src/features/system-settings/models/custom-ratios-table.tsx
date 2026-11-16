@@ -39,14 +39,17 @@ import {
   getCustomRatioMatchMode,
   unflattenCustomRatios,
   type CustomRatioMatchMode,
+  type CustomRatioValueMode,
   type FlatRatioRow,
 } from './model-pricing-core'
 
 type CustomRatiosTableProps = {
-  value: Record<string, Record<string, number>>
+  ratios: Record<string, Record<string, number>>
+  charges: Record<string, Record<string, number>>
   notes?: Record<string, Record<string, string>>
   onChange: (
     ratios: Record<string, Record<string, number>>,
+    charges: Record<string, Record<string, number>>,
     notes: Record<string, Record<string, string>>
   ) => void
 }
@@ -58,7 +61,8 @@ type EditorRow = FlatRatioRow & { groupId: string }
 const GRID_COLS = 'grid grid-cols-[minmax(0,1.3fr)_110px_minmax(0,2fr)_36px]'
 
 export function CustomRatiosTable({
-  value,
+  ratios,
+  charges,
   notes,
   onChange,
 }: CustomRatiosTableProps) {
@@ -71,12 +75,19 @@ export function CustomRatiosTable({
     { value: 'any', label: t('Any value') },
     { value: 'per_item', label: t('Per item') },
   ]
+  const valueModeOptions: Array<{
+    value: CustomRatioValueMode
+    label: string
+  }> = [
+    { value: 'ratio', label: t('Multiplier') },
+    { value: 'charge', label: t('Fixed charge') },
+  ]
   // 本组件自持行状态：行的 id 由本地稳定分配，永不从内容派生，
   // 避免编辑时因 id 变化触发 <Input> 卸载重挂而丢失焦点。
   // 切换模型时通过调用处的 key={editorReloadToken} 重新挂载来重新播种。
   const idRef = useRef(0)
   const [rows, setRows] = useState<EditorRow[]>(() =>
-    flattenCustomRatios(value, notes).map((row) => ({
+    flattenCustomRatios(ratios, charges, notes).map((row) => ({
       ...row,
       id: `row-${idRef.current++}`,
       groupId: `group-${row.paramName}`,
@@ -87,7 +98,7 @@ export function CustomRatiosTable({
     (newRows: EditorRow[]) => {
       setRows(newRows)
       const next = unflattenCustomRatios(newRows)
-      onChange(next.ratios, next.notes)
+      onChange(next.ratios, next.charges, next.notes)
     },
     [onChange]
   )
@@ -114,6 +125,7 @@ export function CustomRatiosTable({
     paramValue: '',
     ratio: 1.0,
     note: '',
+    valueMode: 'ratio',
   })
 
   const handleAddGroup = () => {
@@ -126,6 +138,16 @@ export function CustomRatiosTable({
     const next = [...rows]
     next.splice(lastIndex + 1, 0, newRow(groupId, paramName))
     handleRowsChange(next)
+  }
+
+  // 计费模式按参数（组）统一：同一参数要么全是倍率，要么全是固定加价
+  const handleGroupValueModeChange = (
+    groupId: string,
+    valueMode: CustomRatioValueMode
+  ) => {
+    handleRowsChange(
+      rows.map((row) => (row.groupId === groupId ? { ...row, valueMode } : row))
+    )
   }
 
   const handleRenameGroup = (groupId: string, paramName: string) => {
@@ -144,8 +166,8 @@ export function CustomRatiosTable({
 
   const handleFieldChange = (
     id: string,
-    field: 'paramValue' | 'ratio' | 'note',
-    fieldValue: string | number
+    field: 'paramValue' | 'ratio' | 'note' | 'valueMode',
+    fieldValue: string | number | CustomRatioValueMode
   ) => {
     handleRowsChange(
       rows.map((row) => (row.id === id ? { ...row, [field]: fieldValue } : row))
@@ -181,7 +203,13 @@ export function CustomRatiosTable({
     } else if (row.paramValue.length > 100) {
       errors.push(t('Parameter value is too long'))
     }
-    if (!(row.ratio > 0)) errors.push(t('Multiplier must be greater than 0'))
+    if (!(row.ratio > 0)) {
+      errors.push(
+        row.valueMode === 'charge'
+          ? t('Charge must be greater than 0')
+          : t('Multiplier must be greater than 0')
+      )
+    }
     const duplicate = rows.some(
       (other) =>
         other.id !== row.id &&
@@ -195,16 +223,16 @@ export function CustomRatiosTable({
     <div className='space-y-4'>
       <div>
         <h3 className='text-sm font-semibold'>
-          {t('Custom Parameter Multipliers')}
+          {t('Custom Parameter Multipliers and Charges')}
         </h3>
         <p className='text-muted-foreground mt-1 text-xs'>
           {t(
-            'Configure request parameter multipliers. Multiple multipliers will be multiplied together.'
+            'Configure request parameter multipliers (×ratio) or fixed charges (+USD). Multipliers are multiplied together; charges are summed.'
           )}
         </p>
         <p className='text-muted-foreground mt-1 text-xs'>
           {t(
-            'Exact value: applies when the parameter equals the value. Any value: applies whenever the parameter is present and non-empty. Per item: multiplier × item count (array length; a non-empty single value counts as 1; capped at 128). Use dots for nested fields, e.g. input.images.'
+            'Exact value: applies when the parameter equals the value. Any value: applies whenever the parameter is present and non-empty. Per item: multiplier/charge × item count (array length; a non-empty single value counts as 1; capped at 128). Use dots for nested fields, e.g. input.images.'
           )}
         </p>
       </div>
@@ -253,7 +281,30 @@ export function CustomRatiosTable({
                       nameError && 'border-red-500'
                     )}
                   />
-                  <div>{t('Multiplier')}</div>
+                  <Select
+                    items={valueModeOptions}
+                    value={group.rows[0]?.valueMode ?? 'ratio'}
+                    onValueChange={(v) =>
+                      v !== null &&
+                      handleGroupValueModeChange(group.groupId, v)
+                    }
+                  >
+                    <SelectTrigger
+                      className='h-8 w-full'
+                      aria-label={t('Billing type')}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent alignItemWithTrigger={false}>
+                      <SelectGroup>
+                        {valueModeOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
                   <div>{t('Note')}</div>
                   <Button
                     type='button'
@@ -345,8 +396,12 @@ export function CustomRatiosTable({
                                 Number.parseFloat(e.target.value) || 0
                               )
                             }
-                            placeholder='1.0'
-                            aria-label={t('Multiplier')}
+                            placeholder={row.valueMode === 'charge' ? '0.5' : '1.0'}
+                            aria-label={
+                              row.valueMode === 'charge'
+                                ? t('Charge (USD)')
+                                : t('Multiplier')
+                            }
                             className={cn(
                               'h-8',
                               !(row.ratio > 0) && 'border-red-500'

@@ -60,6 +60,8 @@ export type PricingModel = {
   pricing_version?: string
   /** Custom ratios: parameter name -> (parameter value -> ratio multiplier) */
   custom_ratios?: Record<string, Record<string, number>>
+  // 固定加价（美元，加到单价上而非相乘）：param_name -> param_value -> USD
+  custom_charges?: Record<string, Record<string, number>>
   /** Admin notes for custom ratios: parameter name -> (parameter value -> note) */
   custom_ratio_notes?: Record<string, Record<string, string>>
   /** Admin-written billing explanation, shown for expression pricing */

@@ -324,7 +324,11 @@ function BillingBreakdown(props: {
     } else if (hit.value === '*count') {
       value = `${t('Per item')} (${t('{{count}} items', { count: hit.count ?? 0 })})`
     }
-    rows.push({ label: hit.name, value: `${value} ×${hit.ratio}` })
+    const effect =
+      hit.charge_usd != null && hit.charge_usd > 0
+        ? `+$${hit.charge_usd}`
+        : `×${hit.ratio ?? 1}`
+    rows.push({ label: hit.name, value: `${value} ${effect}` })
   }
 
   const userGR = other.user_group_ratio

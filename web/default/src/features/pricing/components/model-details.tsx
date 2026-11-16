@@ -1195,6 +1195,7 @@ function GroupPricingSection(props: {
 
 function CustomRatiosSection(props: {
   customRatios: Record<string, Record<string, number>>
+  customCharges: Record<string, Record<string, number>>
   notes?: Record<string, Record<string, string>>
 }) {
   const { t } = useTranslation()
@@ -1202,10 +1203,18 @@ function CustomRatiosSection(props: {
   // 按参数名分组：组头一行（参数名 | 倍率 | 备注），其下每个参数值一行
   const groups = useMemo(
     () =>
-      Object.entries(props.customRatios)
+      [
+        ...Object.entries(props.customRatios).map(
+          ([paramName, valueMap]) => [paramName, valueMap, false] as const
+        ),
+        ...Object.entries(props.customCharges).map(
+          ([paramName, valueMap]) => [paramName, valueMap, true] as const
+        ),
+      ]
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([paramName, valueMap]) => ({
+        .map(([paramName, valueMap, charge]) => ({
           paramName,
+          charge,
           rows: Object.entries(valueMap)
             .sort(([a], [b]) =>
               a.localeCompare(b, undefined, { numeric: true })
@@ -1217,7 +1226,7 @@ function CustomRatiosSection(props: {
             })),
         }))
         .filter((group) => group.rows.length > 0),
-    [props.customRatios, props.notes]
+    [props.customRatios, props.customCharges, props.notes]
   )
 
   if (groups.length === 0) return null
@@ -1242,7 +1251,7 @@ function CustomRatiosSection(props: {
                   {group.paramName}
                 </th>
                 <th className='text-muted-foreground px-3 py-2 text-left text-xs font-medium'>
-                  {t('Multiplier')}
+                  {group.charge ? t('Fixed charge') : t('Multiplier')}
                 </th>
                 <th className='text-muted-foreground px-3 py-2 text-left text-xs font-medium'>
                   {t('Note')}
@@ -1257,7 +1266,7 @@ function CustomRatiosSection(props: {
                     {row.paramValue}
                   </td>
                   <td className='text-foreground px-3 py-2.5 font-mono font-semibold'>
-                    ×{row.ratio}
+                    {group.charge ? `+$${row.ratio}` : `×${row.ratio}`}
                   </td>
                   <td className='text-muted-foreground px-3 py-2.5 wrap-break-word'>
                     {row.note || '-'}
@@ -1357,13 +1366,14 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
               tokenUnit={props.tokenUnit}
               showRechargePrice={showRechargePrice}
             />
-            {props.model.custom_ratios &&
-              Object.keys(props.model.custom_ratios).length > 0 && (
-                <CustomRatiosSection
-                  customRatios={props.model.custom_ratios}
-                  notes={props.model.custom_ratio_notes}
-                />
-              )}
+            {(Object.keys(props.model.custom_ratios ?? {}).length > 0 ||
+              Object.keys(props.model.custom_charges ?? {}).length > 0) && (
+              <CustomRatiosSection
+                customRatios={props.model.custom_ratios ?? {}}
+                customCharges={props.model.custom_charges ?? {}}
+                notes={props.model.custom_ratio_notes}
+              />
+            )}
           </section>
 
           <ModelBackendDetailsSection model={props.model} />

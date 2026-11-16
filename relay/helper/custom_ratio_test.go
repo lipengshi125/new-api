@@ -100,7 +100,7 @@ func TestApplyCustomRatios(t *testing.T) {
 			ctx.Request.Header.Set("Content-Type", "application/json")
 			info := &relaycommon.RelayInfo{}
 
-			ApplyCustomRatios(ctx, info, tt.ratios)
+			ApplyCustomRatios(ctx, info, tt.ratios, nil)
 
 			assert.Equal(t, tt.expected, info.PriceData.OtherRatios())
 		})
@@ -122,7 +122,7 @@ func TestApplyCustomRatiosRecordsHitsForLog(t *testing.T) {
 		"videos":     {"*": 1.5},
 		"images":     {"*count": 2},
 		"audios":     {"*": 3},
-	})
+	}, nil)
 
 	// 按参数名排序；空数组不命中，不出现在日志里
 	assert.Equal(t, []billingexpr.ParamMultiplier{
@@ -132,7 +132,7 @@ func TestApplyCustomRatiosRecordsHitsForLog(t *testing.T) {
 	}, info.CustomRatioHits)
 
 	// 渠道重试再次调用时不会重复累积
-	ApplyCustomRatios(ctx, info, map[string]map[string]float64{"videos": {"*": 1.5}})
+	ApplyCustomRatios(ctx, info, map[string]map[string]float64{"videos": {"*": 1.5}}, nil)
 	assert.Len(t, info.CustomRatioHits, 1)
 }
 
@@ -145,10 +145,44 @@ func TestApplyCustomRatiosQueryAndBodyReuse(t *testing.T) {
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	info := &relaycommon.RelayInfo{}
 
-	ApplyCustomRatios(ctx, info, map[string]map[string]float64{"quality": {"*": 1.2}})
+	ApplyCustomRatios(ctx, info, map[string]map[string]float64{"quality": {"*": 1.2}}, nil)
 
 	assert.Equal(t, map[string]float64{"quality": 1.2}, info.PriceData.OtherRatios())
 	body := make([]byte, 64)
 	n, _ := ctx.Request.Body.Read(body)
 	require.Equal(t, `{"prompt":"hi"}`, string(body[:n]), "request body must stay readable for the upstream adaptor")
+}
+
+// TestApplyCustomChargesAreAdditive pins the fixed-charge contract: a charge
+// configured as "*count": 0.5 adds $0.5 per item as a flat USD amount and never
+// enters the multiplicative ratio path (that bug turned "+0.5" into "×0.5").
+func TestApplyCustomChargesAreAdditive(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	body := `{"videos":["a.png","b.png"],"resolution":"4k","watermark":"on"}`
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/videos", strings.NewReader(body))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	info := &relaycommon.RelayInfo{}
+
+	ApplyCustomRatios(ctx, info,
+		map[string]map[string]float64{"resolution": {"4k": 1.6}},
+		map[string]map[string]float64{
+			"videos":    {"*count": 0.5},
+			"watermark": {"*": 0.2},
+			"missing":   {"*": 9},
+		},
+	)
+
+	assert.Equal(t, map[string]float64{"resolution": 1.6}, info.PriceData.OtherRatios())
+	assert.Equal(t, map[string]float64{"videos": 1.0, "watermark": 0.2}, info.PriceData.OtherCharges())
+	assert.InDelta(t, 1.2, info.PriceData.OtherChargesTotalUSD(), 1e-9)
+	assert.InDelta(t, 1.6, info.PriceData.OtherRatioMultiplier(), 1e-9, "charges must not leak into the multiplier")
+
+	assert.Equal(t, []billingexpr.ParamMultiplier{
+		{Name: "resolution", Value: "4k", Ratio: 1.6},
+		{Name: "videos", Value: "*count", Count: 2, ChargeUSD: 1.0},
+		{Name: "watermark", Value: "*", Count: 1, ChargeUSD: 0.2},
+	}, info.CustomRatioHits)
 }

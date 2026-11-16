@@ -56,6 +56,8 @@ var compileEnvPrototypeV1 = map[string]interface{}{
 	"param":                  func(string) interface{} { return nil },
 	"has":                    func(interface{}, string) bool { return false },
 	"video_seconds":          func(string, ...float64) float64 { return 0 },
+	"item_count":             func(string) float64 { return 0 },
+	"video_count":            func(string) float64 { return 0 },
 	"hour":                   func(string) int { return 0 },
 	"minute":                 func(string) int { return 0 },
 	"weekday":                func(string) int { return 0 },
@@ -118,6 +120,9 @@ func compileFromCacheByHash(exprStr, hash string) (*vm.Program, error) {
 		}
 	}
 	if err := validateVideoSecondsCalls(tree); err != nil {
+		return nil, fmt.Errorf("expr compile error: %w", err)
+	}
+	if err := validateItemCountCalls(tree); err != nil {
 		return nil, fmt.Errorf("expr compile error: %w", err)
 	}
 	prog, err := expr.Compile(body, expr.Env(getCompileEnv(version)), expr.AsFloat64())
@@ -192,6 +197,31 @@ func validateVideoSecondsCalls(tree ast.Node) error {
 			if !literal || limit <= 0 || math.IsNaN(limit) || math.IsInf(limit, 0) {
 				err = fmt.Errorf("video_seconds max seconds must be a positive numeric literal")
 			}
+		}
+		return false
+	})
+	return err
+}
+
+// validateItemCountCalls 校验 item_count(path) / video_count(path)：恰好一个参数，
+// 且必须是字符串字面量（与 video_seconds 一致，计费路径必须在配置里写死）。
+func validateItemCountCalls(tree ast.Node) error {
+	var err error
+	ast.Find(tree, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallNode)
+		if !ok || err != nil {
+			return false
+		}
+		callee, ok := call.Callee.(*ast.IdentifierNode)
+		if !ok || (callee.Value != "item_count" && callee.Value != "video_count") {
+			return false
+		}
+		if len(call.Arguments) != 1 {
+			err = fmt.Errorf("%s takes exactly one path argument", callee.Value)
+			return false
+		}
+		if _, isString := call.Arguments[0].(*ast.StringNode); !isString {
+			err = fmt.Errorf("%s path must be a string literal", callee.Value)
 		}
 		return false
 	})

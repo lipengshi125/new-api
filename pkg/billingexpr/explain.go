@@ -8,12 +8,14 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-// ParamMultiplier 描述一个请求参数对计费的倍率影响，用于日志展示。
+// ParamMultiplier 描述一个请求参数对计费的倍率或固定加价影响，用于日志展示。
+// Ratio 和 ChargeUSD 互斥：Ratio > 0 时为乘法因子，ChargeUSD > 0 时为固定美元加价。
 type ParamMultiplier struct {
-	Name  string  `json:"name"`
-	Value string  `json:"value,omitempty"` // 标量参数的值
-	Count int     `json:"count,omitempty"` // 数组参数的元素个数
-	Ratio float64 `json:"ratio"`
+	Name      string  `json:"name"`
+	Value     string  `json:"value,omitempty"`      // 标量参数的值
+	Count     int     `json:"count,omitempty"`      // 数组参数的元素个数
+	Ratio     float64 `json:"ratio,omitempty"`      // 倍率（乘法因子），与 ChargeUSD 互斥
+	ChargeUSD float64 `json:"charge_usd,omitempty"` // 固定加价（美元），与 Ratio 互斥
 }
 
 // ExplainParamMultipliers 解析表达式顶层的乘法因子，找出形如

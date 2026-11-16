@@ -310,6 +310,9 @@ export function evalExprLocally(
       // 预览没有真实请求上下文：请求参数/请求头视为未传，时间函数取本地当前时间
       param: () => null,
       video_seconds: () => 0,
+      // 预览没有真实请求体，按个数计费无法计算，按 0 处理（与 video_seconds 一致）
+      item_count: () => 0,
+      video_count: () => 0,
       // fixed(amount)：每次固定价格，与后端一致换算为 $/1M 系数
       fixed: (amount: number) => Number(amount) * 1_000_000,
       header: () => '',

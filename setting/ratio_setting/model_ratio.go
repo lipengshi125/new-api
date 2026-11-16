@@ -762,6 +762,14 @@ var modelPriceUnitMap = types.NewRWMap[string, string]()
 // Example: "sora-1.0" -> { "resolution" -> { "1k": 1.0, "2k": 1.2, "4k": 1.5 } }
 var customRatiosMap = types.NewRWMap[string, map[string]map[string]float64]()
 
+// customChargesMap stores custom parameter-to-USD-charge mappings per model,
+// with the exact same shape as customRatiosMap but additive ("+USD") semantics
+// instead of multiplicative ("×ratio"). A parameter name appears in either
+// customRatiosMap or customChargesMap, never both (enforced by the admin UI).
+// Format: model_name -> { param_name -> { param_value -> charge_usd } }
+// Example: "seedance-2.0" -> { "videos" -> { "*count": 0.5 } } — "+$0.50 per item"
+var customChargesMap = types.NewRWMap[string, map[string]map[string]float64]()
+
 // customRatioNotesMap stores admin notes for custom ratio entries, shown in the
 // model marketplace. Display-only; never read by billing.
 // Format: model_name -> { param_name -> { param_value -> note } }
@@ -832,6 +840,28 @@ func GetCustomRatios(modelName string) map[string]map[string]float64 {
 	formatted := FormatMatchingModelName(modelName)
 	if ratios, ok := customRatiosMap.Get(formatted); ok {
 		return ratios
+	}
+	return nil
+}
+
+func GetCustomChargesMap() map[string]map[string]map[string]float64 {
+	return customChargesMap.ReadAll()
+}
+
+func CustomCharges2JSONString() string {
+	return customChargesMap.MarshalJSONString()
+}
+
+func UpdateCustomChargesByJSONString(jsonStr string) error {
+	return types.LoadFromJsonStringWithCallback(customChargesMap, jsonStr, InvalidateExposedDataCache)
+}
+
+// GetCustomCharges returns the custom parameter-to-USD-charge mappings for a model.
+// Returns nil if no custom charges are configured for the model.
+func GetCustomCharges(modelName string) map[string]map[string]float64 {
+	formatted := FormatMatchingModelName(modelName)
+	if charges, ok := customChargesMap.Get(formatted); ok {
+		return charges
 	}
 	return nil
 }

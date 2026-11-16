@@ -108,12 +108,15 @@ func ResolveOriginTask(c *gin.Context, info *relaycommon.RelayInfo) *dto.TaskErr
 		info.ApiKey = key
 	}
 
-	// 提取 remix 参数（时长、分辨率 → OtherRatios）
+	// 提取 remix 参数（时长、分辨率 → OtherRatios，固定加价 → OtherCharges）
 	if info.Action == constant.TaskActionRemix {
 		if originTask.PrivateData.BillingContext != nil {
-			// 新的 remix 逻辑：直接从原始任务的 BillingContext 中提取 OtherRatios（如果存在）
+			// 新的 remix 逻辑：直接从原始任务的 BillingContext 中提取 OtherRatios 和 OtherCharges（如果存在）
 			for s, f := range originTask.PrivateData.BillingContext.OtherRatios {
 				info.PriceData.AddOtherRatio(s, f)
+			}
+			for s, f := range originTask.PrivateData.BillingContext.OtherCharges {
+				info.PriceData.AddOtherCharge(s, f)
 			}
 		} else {
 			// 旧的 remix 逻辑：直接从 task data 解析 seconds 和 size（如果存在）
@@ -214,8 +217,10 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 
 		// 5.3 应用自定义倍率配置：从请求参数中检测自定义字段（如 resolution、quality 等）
 		//     并应用管理员配置的倍率映射
-		if customRatios := ratio_setting.GetCustomRatios(modelName); len(customRatios) > 0 {
-			helper.ApplyCustomRatios(c, info, customRatios)
+		customRatios := ratio_setting.GetCustomRatios(modelName)
+		customCharges := ratio_setting.GetCustomCharges(modelName)
+		if len(customRatios) > 0 || len(customCharges) > 0 {
+			helper.ApplyCustomRatios(c, info, customRatios, customCharges)
 		}
 
 		// 5.5 时长倍率仅在按秒计费时生效：按次计费的模型不应乘以 seconds/duration，
@@ -225,10 +230,14 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 			info.PriceData.RemoveOtherRatio("duration")
 		}
 
-		// 6. 将 OtherRatios 应用到基础额度（饱和转换，防止溢出成负数）
+		// 6. 将 OtherRatios 应用到基础额度，并加上固定加价（饱和转换，防止溢出成负数）
 		if !common.StringsContains(constant.TaskPricePatches, modelName) {
 			quotaWithRatios := info.PriceData.ApplyOtherRatiosToFloat(float64(info.PriceData.Quota))
-			quota, clamp := common.QuotaFromFloatChecked(quotaWithRatios)
+			// 固定加价（美元）需要转换成 quota 单位：× QuotaPerUnit × GroupRatio
+			chargesUSD := info.PriceData.OtherChargesTotalUSD()
+			chargesQuota := chargesUSD * common.QuotaPerUnit * info.PriceData.GroupRatioInfo.GroupRatio
+			totalQuota := quotaWithRatios + chargesQuota
+			quota, clamp := common.QuotaFromFloatChecked(totalQuota)
 			info.PriceData.Quota = quota
 			noteTaskQuotaClamp(info, clamp)
 		}
@@ -301,16 +310,18 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 }
 
 // recalcQuotaFromRatios 根据 adjustedRatios 重新计算 quota。
-// 公式: baseQuota × ∏(ratio) — 其中 baseQuota 是不含 OtherRatios 的基础额度。
+// 公式: baseQuota × ∏(ratio) + chargesQuota — 其中 baseQuota 是不含 OtherRatios
+// 和固定加价的基础额度；固定加价不随倍率缩放，先扣除、再原样加回。
 func recalcQuotaFromRatios(info *relaycommon.RelayInfo, ratios map[string]float64) (int, bool) {
-	// 从 PriceData 获取不含 OtherRatios 的基础价格
-	baseQuota := info.PriceData.RemoveOtherRatiosFromFloat(float64(info.PriceData.Quota))
+	chargesQuota := info.PriceData.OtherChargesTotalUSD() * common.QuotaPerUnit * info.PriceData.GroupRatioInfo.GroupRatio
+	// 从 PriceData 获取不含 OtherRatios 和固定加价的基础价格
+	baseQuota := info.PriceData.RemoveOtherRatiosFromFloat(float64(info.PriceData.Quota) - chargesQuota)
 	priceData := info.PriceData
 	if !priceData.ReplaceOtherRatios(ratios) {
 		return 0, false
 	}
-	// 应用新的 ratios
-	result := priceData.ApplyOtherRatiosToFloat(baseQuota)
+	// 应用新的 ratios，再加回固定加价
+	result := priceData.ApplyOtherRatiosToFloat(baseQuota) + chargesQuota
 	quota, clamp := common.QuotaFromFloatChecked(result)
 	noteTaskQuotaClamp(info, clamp)
 	return quota, true

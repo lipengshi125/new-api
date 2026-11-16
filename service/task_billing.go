@@ -66,7 +66,11 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 		var customContents []string
 		for _, hit := range info.CustomRatioHits {
 			customHits[hit.Name] = true
-			customContents = append(customContents, fmt.Sprintf("%s=%s ×%s", hit.Name, customRatioHitValue(hit), strconv.FormatFloat(hit.Ratio, 'f', -1, 64)))
+			if hit.ChargeUSD > 0 {
+				customContents = append(customContents, fmt.Sprintf("%s=%s +$%s", hit.Name, customRatioHitValue(hit), strconv.FormatFloat(hit.ChargeUSD, 'f', -1, 64)))
+			} else if hit.Ratio > 0 {
+				customContents = append(customContents, fmt.Sprintf("%s=%s ×%s", hit.Name, customRatioHitValue(hit), strconv.FormatFloat(hit.Ratio, 'f', -1, 64)))
+			}
 		}
 		var contents []string
 		for key, ra := range info.PriceData.OtherRatios() {
@@ -222,11 +226,11 @@ func taskBillingOther(task *model.Task) map[string]interface{} {
 }
 
 func taskBillingContextPriceData(bc *model.TaskBillingContext) *types.PriceData {
-	if bc == nil || len(bc.OtherRatios) == 0 {
+	if bc == nil || (len(bc.OtherRatios) == 0 && len(bc.OtherCharges) == 0) {
 		return nil
 	}
 	priceData := &types.PriceData{}
-	if !priceData.ReplaceOtherRatios(bc.OtherRatios) {
+	if !priceData.ReplaceOtherRatios(bc.OtherRatios) && !priceData.ReplaceOtherCharges(bc.OtherCharges) {
 		return nil
 	}
 	return priceData
@@ -384,15 +388,20 @@ func RecalculateTaskQuotaByTokens(ctx context.Context, task *model.Task, totalTo
 		finalGroupRatio = groupRatio
 	}
 
-	// 计算 OtherRatios 乘积（视频折扣、时长等）
+	// 计算 OtherRatios 乘积（视频折扣、时长等）和 OtherCharges 总额（固定加价）
 	otherMultiplier := 1.0
+	otherChargesUSD := 0.0
 	if priceData := taskBillingContextPriceData(task.PrivateData.BillingContext); priceData != nil {
 		otherMultiplier = priceData.OtherRatioMultiplier()
+		otherChargesUSD = priceData.OtherChargesTotalUSD()
 	}
 
-	// 计算实际应扣费额度: totalTokens * modelRatio * groupRatio * otherMultiplier（饱和转换，防止溢出成负数）
-	actualQuota, clamp := common.QuotaFromFloatChecked(float64(totalTokens) * modelRatio * finalGroupRatio * otherMultiplier)
+	// 计算实际应扣费额度: (totalTokens * modelRatio * groupRatio * otherMultiplier) + (otherCharges * QuotaPerUnit * groupRatio)
+	// 饱和转换，防止溢出成负数
+	quotaFromTokens := float64(totalTokens) * modelRatio * finalGroupRatio * otherMultiplier
+	quotaFromCharges := otherChargesUSD * common.QuotaPerUnit * finalGroupRatio
+	actualQuota, clamp := common.QuotaFromFloatChecked(quotaFromTokens + quotaFromCharges)
 
-	reason := fmt.Sprintf("token重算：tokens=%d, modelRatio=%.2f, groupRatio=%.2f, otherMultiplier=%.4f", totalTokens, modelRatio, finalGroupRatio, otherMultiplier)
+	reason := fmt.Sprintf("token重算：tokens=%d, modelRatio=%.2f, groupRatio=%.2f, otherMultiplier=%.4f, chargesUSD=%.2f", totalTokens, modelRatio, finalGroupRatio, otherMultiplier, otherChargesUSD)
 	RecalculateTaskQuota(ctx, task, actualQuota, reason, clamp)
 }

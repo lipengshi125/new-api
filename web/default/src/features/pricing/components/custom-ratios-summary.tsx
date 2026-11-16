@@ -23,7 +23,8 @@ import type { PricingModel } from '../types'
 
 type MultiplierGroup = {
   name: string
-  rows: Array<{ value: string; ratio: number }>
+  // charge 为 true 时 ratio 存的是固定加价（美元），展示为 +$x
+  rows: Array<{ value: string; ratio: number; charge?: boolean }>
 }
 
 /**
@@ -56,7 +57,8 @@ function MultiplierGroupsSummary(props: {
                 {row.value}
               </span>
               <span className='font-mono font-semibold text-purple-600 dark:text-purple-400'>
-                ×{Number(row.ratio.toFixed(4))}
+                {row.charge ? '+$' : '×'}
+                {Number(row.ratio.toFixed(4))}
               </span>
               <span className='text-muted-foreground/80 wrap-break-word'>
                 {props.notes?.[group.name]?.[row.value]}
@@ -71,17 +73,22 @@ function MultiplierGroupsSummary(props: {
 
 /** 自定义倍率参数（按次/按秒计费模型） */
 export function CustomRatiosSummary(props: { model: PricingModel }) {
-  const ratios = props.model.custom_ratios
-  if (!ratios) return null
+  const ratios = props.model.custom_ratios ?? {}
+  const charges = props.model.custom_charges ?? {}
 
-  const groups = Object.entries(ratios)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([name, valueMap]) => ({
+  const toGroups = (
+    source: Record<string, Record<string, number>>,
+    charge: boolean
+  ): MultiplierGroup[] =>
+    Object.entries(source).map(([name, valueMap]) => ({
       name,
       rows: Object.entries(valueMap)
         .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
-        .map(([value, ratio]) => ({ value, ratio })),
+        .map(([value, ratio]) => ({ value, ratio, charge })),
     }))
+
+  const groups = [...toGroups(ratios, false), ...toGroups(charges, true)]
+    .sort((a, b) => a.name.localeCompare(b.name))
     .filter((group) => group.rows.length > 0)
 
   return (

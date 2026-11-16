@@ -150,6 +150,7 @@ func InitOptionMap() {
 	common.OptionMap["ModelPrice"] = ratio_setting.ModelPrice2JSONString()
 	common.OptionMap["ModelPriceUnit"] = ratio_setting.ModelPriceUnit2JSONString()
 	common.OptionMap["CustomRatios"] = ratio_setting.CustomRatios2JSONString()
+	common.OptionMap["CustomCharges"] = ratio_setting.CustomCharges2JSONString()
 	common.OptionMap["CustomRatioNotes"] = ratio_setting.CustomRatioNotes2JSONString()
 	common.OptionMap["ModelBillingNotes"] = ratio_setting.ModelBillingNotes2JSONString()
 	common.OptionMap["CacheRatio"] = ratio_setting.CacheRatio2JSONString()
@@ -565,6 +566,11 @@ func updateOptionMap(key string, value string) (err error) {
 		err = ratio_setting.UpdateModelPriceUnitByJSONString(value)
 	case "CustomRatios":
 		err = ratio_setting.UpdateCustomRatiosByJSONString(value)
+		if err == nil {
+			InvalidatePricingCache()
+		}
+	case "CustomCharges":
+		err = ratio_setting.UpdateCustomChargesByJSONString(value)
 		if err == nil {
 			InvalidatePricingCache()
 		}

@@ -1,6 +1,7 @@
 package billingexpr
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -109,4 +110,54 @@ func TestUsesFixedPricing(t *testing.T) {
 	assert.True(t, UsesFixedPricing(`true ? tier("tokens", p) : tier("request", fixed(0.01))`))
 	assert.False(t, UsesFixedPricing(`tier("base", 160000)`))
 	assert.False(t, UsesFixedPricing(`tier("base", p * 2 + c * 8)`))
+}
+
+// TestItemCount pins item_count/video_count: the count of non-empty elements at
+// any request path (videos, images, audios, nested), usable additively inside a
+// tier price and as a request-condition multiplier, capped at MaxItemCount.
+func TestItemCount(t *testing.T) {
+	body := []byte(`{"videos":["a.mp4","b.mp4"],"images":["x","", null,"z"],"audios":[],"input":{"refs":[{"url":"u"},{}]},"cover":"c.png","many":[` +
+		strings.TrimSuffix(strings.Repeat(`"u",`, MaxItemCount+20), ",") + `]}`)
+	request := RequestInput{Body: body}
+
+	tests := []struct {
+		name string
+		expr string
+		want float64
+	}{
+		{"videos array", `item_count("videos")`, 2},
+		{"video_count alias", `video_count("videos")`, 2},
+		{"images skips empty and null", `item_count("images")`, 2},
+		{"empty array", `item_count("audios")`, 0},
+		{"missing path", `item_count("masks")`, 0},
+		{"nested path skips empty object", `item_count("input.refs")`, 1},
+		{"scalar counts as one", `item_count("cover")`, 1},
+		{"capped", `item_count("many")`, MaxItemCount},
+		// +$0.5 per video on top of a $0.2 base: 0.2*1e6 + 2*0.5*1e6
+		{"additive per-item price", `tier("base", 200000 + item_count("videos") * 500000)`, 1_200_000},
+		{"combined with resolution multiplier", `tier("base", 200000 + item_count("videos") * 500000) * (param("resolution") == "4k" ? 1.6 : 1)`, 1_200_000},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cost, _, err := RunExprWithRequest(tt.expr, TokenParams{}, request)
+			require.NoError(t, err)
+			assert.InDelta(t, tt.want, cost, 1e-6)
+		})
+	}
+
+	// item_count 可作为 fixed() 计费的请求条件倍率
+	cost, _, err := RunExprWithRequest(`tier("base", fixed(0.2)) * (item_count("videos") > 1 ? 1.5 : 1)`, TokenParams{}, request)
+	require.NoError(t, err)
+	assert.InDelta(t, 300000, cost, 1e-6)
+
+	for _, expression := range []string{
+		`tier("base", 200000 + item_count(param("path")) * 500000)`,
+		`tier("base", 200000 + item_count() * 500000)`,
+		`tier("base", 200000 + video_count("videos", 3) * 500000)`,
+	} {
+		t.Run(expression, func(t *testing.T) {
+			_, err := CompileFromCache(expression)
+			require.Error(t, err)
+		})
+	}
 }
