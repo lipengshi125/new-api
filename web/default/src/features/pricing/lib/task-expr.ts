@@ -41,6 +41,7 @@ For commercial licensing, please contact support@quantumnous.com
 export type TaskSecondsSource =
   | { kind: 'param'; path: string }
   | { kind: 'video'; path: string; maxSeconds?: number }
+  | { kind: 'item_charge'; path: string; chargePerItem: number }
 
 export type TaskParamMultiplier = {
   name: string
@@ -53,6 +54,8 @@ export type TaskExprPricing = {
   /** Price per call / per second, in the expression's currency unit (USD). */
   unitPrice: number
   secondsSources: TaskSecondsSource[]
+  /** Per-item charges from item_count/video_count: path -> price in USD. */
+  itemCharges: Record<string, number>
   multipliers: TaskParamMultiplier[]
 }
 
@@ -144,12 +147,26 @@ function parseSecondsTerm(term: string): TaskSecondsSource | null {
     /^(?:float\()?param\("([^"]+)"\)(?:\?\?\d+(?:\.\d+)?)?\)?$/
   )
   if (param) return { kind: 'param', path: param[1] }
+  // item_count("videos") * 500000 或 video_count(...) * 500000
+  const itemCharge = compact.match(
+    /^(?:item_count|video_count)\("([^"]+)"\)\*(\d+(?:\.\d+)?)$/
+  )
+  if (itemCharge) {
+    return {
+      kind: 'item_charge',
+      path: itemCharge[1],
+      chargePerItem: Number(itemCharge[2]) / 1_000_000,
+    }
+  }
   return null
 }
 
 function parseBase(
   base: string
-): Pick<TaskExprPricing, 'unit' | 'unitPrice' | 'secondsSources'> | null {
+): Pick<
+  TaskExprPricing,
+  'unit' | 'unitPrice' | 'secondsSources' | 'itemCharges'
+> | null {
   const tier = unwrap(base).match(
     new RegExp(`^tier\\(\\s*${STR}\\s*,\\s*([\\s\\S]+)\\)$`)
   )
@@ -163,6 +180,7 @@ function parseBase(
       unit: 'request',
       unitPrice: Number(fixed[1]),
       secondsSources: [],
+      itemCharges: {},
     }
   }
 
@@ -173,25 +191,35 @@ function parseBase(
       unit: 'request',
       unitPrice: Number(flat[1]) / 1_000_000,
       secondsSources: [],
+      itemCharges: {},
     }
   }
 
   const factors = splitTopLevelFactors(body)
-  if (factors.length !== 2) return null
-  const [coef, secondsExpr] = factors
+  if (factors.length < 2) return null
+  const [coef, ...rest] = factors
   if (!new RegExp(`^${NUM}$`).test(coef)) return null
 
   const sources: TaskSecondsSource[] = []
-  for (const term of splitTopLevelTerms(unwrap(secondsExpr))) {
+  const itemCharges: Record<string, number> = {}
+  for (const term of splitTopLevelTerms(unwrap(rest.join('*')))) {
     const source = parseSecondsTerm(term)
     if (!source) return null
-    sources.push(source)
+    if (source.kind === 'item_charge') {
+      itemCharges[source.path] = source.chargePerItem
+    } else {
+      sources.push(source)
+    }
   }
-  if (sources.length === 0) return null
+  // 如果只有 item_count 没有秒数项，按次计费；否则按秒
+  if (sources.length === 0 && Object.keys(itemCharges).length === 0) {
+    return null
+  }
   return {
-    unit: 'second',
+    unit: sources.length > 0 ? 'second' : 'request',
     unitPrice: Number(coef) / 1_000_000,
     secondsSources: sources,
+    itemCharges,
   }
 }
 
@@ -227,7 +255,7 @@ export function parseTaskExprPricing(
     if (!multiplier) return null
     multipliers.push(multiplier)
   }
-  return { ...parsedBase, multipliers }
+  return { ...parsedBase, itemCharges: parsedBase.itemCharges || {}, multipliers }
 }
 
 /** Group multipliers by parameter name, keeping first-seen order. */

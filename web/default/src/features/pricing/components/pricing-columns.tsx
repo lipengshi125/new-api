@@ -46,6 +46,7 @@ import type { PricingModel, TokenUnit } from '../types'
 import {
   CustomRatiosSummary,
   TaskMultipliersSummary,
+  TaskItemChargesSummary,
 } from './custom-ratios-summary'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { TaskUnitLabel } from './task-expr-pricing'
@@ -154,6 +155,7 @@ export function usePricingColumns(
                     ` · ${t('incl. reference video')}`}
                 </div>
                 <TaskMultipliersSummary model={model} pricing={taskPricing} />
+                <TaskItemChargesSummary pricing={taskPricing} />
               </div>
             )
           }

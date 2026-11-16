@@ -223,6 +223,31 @@ export function TaskExprPricingDetails(
         </div>
       )}
 
+      {Object.keys(pricing.itemCharges).length > 0 && (
+        <div>
+          <div className='text-foreground mb-2 text-sm font-semibold'>
+            {t('Per-Item Charges')}
+          </div>
+          <div className='bg-muted/20 space-y-1 rounded-lg border px-3 py-2.5'>
+            {Object.entries(pricing.itemCharges)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([path, usd]) => (
+                <div key={path} className='flex justify-between items-center'>
+                  <span className='text-muted-foreground font-mono text-sm'>
+                    {path}
+                  </span>
+                  <span className='font-mono font-semibold text-blue-600 dark:text-blue-400'>
+                    +${Number(usd.toFixed(4))}
+                  </span>
+                </div>
+              ))}
+          </div>
+          <p className='text-muted-foreground mt-1.5 text-xs'>
+            {t('Added per non-empty item at the path')}
+          </p>
+        </div>
+      )}
+
       <div className='bg-muted/20 space-y-1.5 rounded-lg border px-3 py-2.5 text-sm'>
         <div>
           <span className='text-muted-foreground'>

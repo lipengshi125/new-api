@@ -111,3 +111,34 @@ export function TaskMultipliersSummary(props: {
     />
   )
 }
+
+/** 表达式中的按个数加价（任务表达式计费模型） */
+export function TaskItemChargesSummary(props: {
+  pricing: TaskExprPricing
+}) {
+  const { t } = useTranslation()
+  if (Object.keys(props.pricing.itemCharges).length === 0) return null
+
+  return (
+    <div className='border-border/30 mt-1.5 space-y-1 border-t pt-1'>
+      <div className='text-muted-foreground/70 text-[9px] font-semibold tracking-wide uppercase'>
+        {t('Per-item Charges')}
+      </div>
+      {Object.entries(props.pricing.itemCharges)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([path, usd]) => (
+          <div
+            key={path}
+            className='grid grid-cols-[auto_auto_minmax(0,1fr)] items-baseline gap-x-1.5 pl-2 text-[10px]'
+          >
+            <span className='text-muted-foreground font-mono break-all'>
+              {path}
+            </span>
+            <span className='font-mono font-semibold text-blue-600 dark:text-blue-400'>
+              +${Number(usd.toFixed(4))}
+            </span>
+          </div>
+        ))}
+    </div>
+  )
+}

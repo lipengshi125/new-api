@@ -3253,6 +3253,8 @@
     "Parameter value is required": "Parameter value is required",
     "Parameter value is too long": "Parameter value is too long",
     "Multiplier must be greater than 0": "Multiplier must be greater than 0",
+    "Per-item Charges": "Per-item Charges",
+    "Added per non-empty item at the path": "Added per non-empty item at the path",
     "Custom Parameter Multipliers and Charges": "Custom Parameter Multipliers and Charges",
     "Configure request parameter multipliers (×ratio) or fixed charges (+USD). Multipliers are multiplied together; charges are summed.": "Configure request parameter multipliers (×ratio) or fixed charges (+USD). Multipliers are multiplied together; charges are summed.",
     "Exact value: applies when the parameter equals the value. Any value: applies whenever the parameter is present and non-empty. Per item: multiplier/charge × item count (array length; a non-empty single value counts as 1; capped at 128). Use dots for nested fields, e.g. input.images.": "Exact value: applies when the parameter equals the value. Any value: applies whenever the parameter is present and non-empty. Per item: multiplier/charge × item count (array length; a non-empty single value counts as 1; capped at 128). Use dots for nested fields, e.g. input.images.",
