@@ -252,9 +252,15 @@ export function BillingHistoryDialog({
                           <Label className='text-muted-foreground text-xs'>
                             {t('Payment')}
                           </Label>
-                          <div className='text-sm font-semibold text-red-600'>
-                            {formatNumber(record.money)}
-                          </div>
+                          {record.payment_method === 'redemption' ? (
+                            <div className='text-sm font-semibold'>
+                              {t('Redemption Code Payment')}
+                            </div>
+                          ) : (
+                            <div className='text-sm font-semibold text-red-600'>
+                              {formatNumber(record.money)}
+                            </div>
+                          )}
                         </div>
                       </div>
 
