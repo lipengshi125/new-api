@@ -73,8 +73,13 @@ export function TaskExprPricingDetails(
   const { pricing } = props
   const notes = props.model.custom_ratio_notes
   const groups = groupTaskMultipliers(pricing.multipliers)
+  // 加法形式 tier("base", K * (倍率) + 常数 + item_count(...) * N) 里，
+  // 基础价是 K 加上常数项；倍率和按个数加价另行展示。
+  const additiveBase =
+    (pricing.extraBasePrice ?? 0) + (pricing.extraFixedCharge ?? 0)
+  const basePriceUSD = pricing.unitPrice + additiveBase
   const unitPrice = formatTaskUnitPrice(
-    pricing.unitPrice,
+    basePriceUSD,
     1,
     props.showRechargePrice,
     props.priceRate,
@@ -106,8 +111,19 @@ export function TaskExprPricingDetails(
     return { name: group.name, value: top.value, ratio: top.ratio }
   })
   const exampleMultiplier = exampleChoices.reduce((acc, c) => acc * c.ratio, 1)
+  const itemChargeEntries = Object.entries(pricing.itemCharges ?? {}).sort(
+    ([a], [b]) => a.localeCompare(b)
+  )
+  const exampleItemCount = 2
+  const exampleItemTotal = itemChargeEntries.reduce(
+    (acc, [, usd]) => acc + usd * exampleItemCount,
+    0
+  )
+  const exampleBaseUSD = (pricing.unitPrice + additiveBase) *
+    exampleSeconds *
+    exampleMultiplier
   const examplePrice = formatTaskUnitPrice(
-    pricing.unitPrice * exampleSeconds * exampleMultiplier,
+    exampleBaseUSD + exampleItemTotal,
     1,
     props.showRechargePrice,
     props.priceRate,
@@ -125,6 +141,9 @@ export function TaskExprPricingDetails(
         ]
       : []),
     ...exampleChoices.map((c) => `${c.name}=${c.value}`),
+    ...itemChargeEntries.map(([path]) =>
+      t('{{count}} {{path}}', { count: exampleItemCount, path })
+    ),
   ]
   // 计算过程：单价 × 秒数 × 各参数倍率，例如 $0.05×5×2×1.35
   const exampleSteps = [
@@ -137,7 +156,12 @@ export function TaskExprPricingDetails(
         ]
       : []),
     ...exampleChoices.map((c) => formatRatio(c.ratio)),
-  ].join('×')
+  ].join('×') +
+    (itemChargeEntries.length > 0
+      ? ` + ${itemChargeEntries
+          .map(([, usd]) => `$${Number((usd * exampleItemCount).toFixed(4))}`)
+          .join(' + ')}`
+      : '')
 
   const rowClass =
     'grid grid-cols-[7rem_minmax(0,1fr)] gap-3 py-1.5 text-sm sm:grid-cols-[8rem_minmax(0,1fr)]'

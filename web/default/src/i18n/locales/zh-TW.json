@@ -3253,6 +3253,7 @@
     "Parameter value is required": "Parameter value is required",
     "Parameter value is too long": "Parameter value is too long",
     "Multiplier must be greater than 0": "Multiplier must be greater than 0",
+    "{{count}} {{path}}": "{{count}} 個 {{path}}",
     "Per-item Charges": "按個數加價",
     "Added per non-empty item at the path": "在路徑處每有一個非空元素就增加該費用",
     "Custom Parameter Multipliers and Charges": "自訂倍率與加價參數",

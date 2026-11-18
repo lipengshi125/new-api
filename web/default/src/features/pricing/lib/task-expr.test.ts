@@ -11,10 +11,13 @@ describe('parseTaskExprPricing', () => {
     assert.deepEqual(parseTaskExprPricing(VIDEO_EXPR), {
       unit: 'second',
       unitPrice: 0.18,
+      extraBasePrice: 0,
+      extraFixedCharge: 0,
       secondsSources: [
         { kind: 'param', path: 'duration' },
         { kind: 'video', path: 'videos' },
       ],
+      itemCharges: {},
       multipliers: [
         { name: 'resolution', value: '720p', ratio: 1.75 },
         { name: 'resolution', value: '1080p', ratio: 3.5 },
@@ -30,7 +33,10 @@ describe('parseTaskExprPricing', () => {
       {
         unit: 'second',
         unitPrice: 0.05,
+        extraBasePrice: 0,
+        extraFixedCharge: 0,
         secondsSources: [{ kind: 'param', path: 'duration' }],
+        itemCharges: {},
         multipliers: [
           { name: 'sound', value: 'true', ratio: 1.35 },
           { name: 'resolution', value: '1080p', ratio: 2 },
@@ -73,7 +79,10 @@ describe('parseTaskExprPricing', () => {
       {
         unit: 'request',
         unitPrice: 0.15,
+        extraBasePrice: 0,
+        extraFixedCharge: 0,
         secondsSources: [],
+        itemCharges: {},
         multipliers: [
           { name: 'resolution', value: '1k', ratio: 1 },
           { name: 'resolution', value: '4k', ratio: 1.6 },
@@ -92,7 +101,10 @@ describe('parseTaskExprPricing', () => {
     assert.deepEqual(fixed, {
       unit: 'request',
       unitPrice: 0.16,
+      extraBasePrice: 0,
+      extraFixedCharge: 0,
       secondsSources: [],
+      itemCharges: {},
       multipliers: [{ name: 'resolution', value: '4k', ratio: 1.6 }],
     })
     assert.deepEqual(fixed, legacy)
@@ -121,6 +133,46 @@ describe('parseTaskExprPricing', () => {
     )
     assert.equal(parseTaskExprPricing(''), null)
   })
+  test('per-item charge added inside tier() after a multiplier', () => {
+    assert.deepEqual(
+      parseTaskExprPricing(
+        'tier("base", 200000 * (param("resolution") == "4k" ? 1.6 : 1) + item_count("videos") * 500000)'
+      ),
+      {
+        unit: 'request',
+        unitPrice: 0,
+        extraBasePrice: 0.2,
+        extraFixedCharge: 0,
+        secondsSources: [],
+        itemCharges: { videos: 0.5 },
+        multipliers: [{ name: 'resolution', value: '4k', ratio: 1.6 }],
+      }
+    )
+
+    const withConstant = parseTaskExprPricing(
+      'tier("base", 200000 * (param("resolution") == "4k" ? 1.6 : 1) + item_count("images") * 250000 + 100000)'
+    )
+    assert.deepEqual(withConstant?.itemCharges, { images: 0.25 })
+    assert.equal(withConstant?.extraBasePrice, 0.2)
+    assert.equal(withConstant?.extraFixedCharge, 0.1)
+
+    // 无倍率、只按个数加价也可识别（用于模型广场展示）
+    assert.deepEqual(
+      parseTaskExprPricing(
+        'tier("base", 200000 + item_count("videos") * 500000)'
+      ),
+      {
+        unit: 'request',
+        unitPrice: 0,
+        extraBasePrice: 0,
+        extraFixedCharge: 0.2,
+        secondsSources: [],
+        itemCharges: { videos: 0.5 },
+        multipliers: [],
+      }
+    )
+  })
+
 })
 
 describe('groupTaskMultipliers', () => {

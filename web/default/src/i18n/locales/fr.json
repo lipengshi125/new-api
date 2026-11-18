@@ -3253,6 +3253,7 @@
     "Parameter value is required": "Parameter value is required",
     "Parameter value is too long": "Parameter value is too long",
     "Multiplier must be greater than 0": "Multiplier must be greater than 0",
+    "{{count}} {{path}}": "{{count}} {{path}}",
     "Per-item Charges": "Per-item Charges",
     "Added per non-empty item at the path": "Added per non-empty item at the path",
     "Custom Parameter Multipliers and Charges": "Custom Parameter Multipliers and Charges",

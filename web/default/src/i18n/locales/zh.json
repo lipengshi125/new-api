@@ -3253,6 +3253,7 @@
     "Parameter value is required": "参数值不能为空",
     "Parameter value is too long": "参数值过长",
     "Multiplier must be greater than 0": "倍率必须大于 0",
+    "{{count}} {{path}}": "{{count}} 个 {{path}}",
     "Per-item Charges": "按个数加价",
     "Added per non-empty item at the path": "在路径处每有一个非空元素就增加该费用",
     "Custom Parameter Multipliers and Charges": "自定义倍率与加价参数",
