@@ -963,7 +963,10 @@ function GroupPricingSection(props: {
                 cellClassName: 'py-2.5 text-right font-mono',
                 cell: (group) =>
                   `${formatTaskUnitPrice(
-                    taskPricing.unitPrice,
+                    // 加法形式的基础价 = K + 常数项；倍率与按个数加价另行展示
+                    taskPricing.unitPrice +
+                      (taskPricing.extraBasePrice ?? 0) +
+                      (taskPricing.extraFixedCharge ?? 0),
                     props.groupRatio[group] || 1,
                     showRechargePrice,
                     props.priceRate,

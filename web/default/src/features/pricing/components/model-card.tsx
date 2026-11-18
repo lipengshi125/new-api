@@ -107,7 +107,10 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
       <span className='text-muted-foreground whitespace-nowrap'>
         <span className='text-foreground font-mono font-semibold'>
           {formatTaskUnitPrice(
-            taskPricing.unitPrice,
+            // 加法形式的基础价 = K + 常数项；不含倍率与按个数加价
+            taskPricing.unitPrice +
+              (taskPricing.extraBasePrice ?? 0) +
+              (taskPricing.extraFixedCharge ?? 0),
             getDynamicDisplayGroupRatio(props.model, props.selectedGroup),
             showRechargePrice,
             priceRate,

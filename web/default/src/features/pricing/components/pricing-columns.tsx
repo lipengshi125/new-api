@@ -141,7 +141,11 @@ export function usePricingColumns(
                 <span className='font-mono text-sm tabular-nums'>
                   {stripTrailingZeros(
                     formatTaskUnitPrice(
-                      taskPricing.unitPrice,
+                      // 加法形式 tier("base", K * (倍率) + 常数 + item_count()*N)
+                      // 的基础价是 K + 常数项，必须一起算进单价，否则卡片显示 $0
+                      taskPricing.unitPrice +
+                        (taskPricing.extraBasePrice ?? 0) +
+                        (taskPricing.extraFixedCharge ?? 0),
                       getDynamicDisplayGroupRatio(model, selectedGroup),
                       showRechargePrice,
                       priceRate,
