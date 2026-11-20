@@ -53,6 +53,8 @@ func TestMain(m *testing.M) {
 		&SystemInstance{},
 		&SystemTask{},
 		&SystemTaskLock{},
+		&ModelTimeline{},
+		&SystemAnnouncement{},
 	); err != nil {
 		panic("failed to migrate: " + err.Error())
 	}
