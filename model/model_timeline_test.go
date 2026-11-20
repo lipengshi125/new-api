@@ -15,10 +15,69 @@ func clearTimelineTables(t *testing.T) {
 		DB.Exec("DELETE FROM system_announcements")
 		DB.Exec("DELETE FROM abilities")
 		DB.Exec("DELETE FROM channels")
+		DB.Exec("DELETE FROM options WHERE `key` = ?", timelineBaselineOptionKey)
 	}
 	// 前后都清一次：其他测试可能留下同 id 的渠道
 	wipe()
 	t.Cleanup(wipe)
+	// 默认认为基线已完成，这样各用例聚焦于真实的上下线事件
+	markBaselineDone(t)
+}
+
+func markBaselineDone(t *testing.T) {
+	t.Helper()
+	require.NoError(t, DB.Save(&Option{Key: timelineBaselineOptionKey, Value: "true"}).Error)
+}
+
+// 升级后首次运行：存量模型只建立基线，不产生公告
+func TestModelTimeline_BaselineSeedsWithoutAnnouncement(t *testing.T) {
+	clearTimelineTables(t)
+	DB.Exec("DELETE FROM options WHERE `key` = ?", timelineBaselineOptionKey)
+
+	channel := newTestChannel(t, 20, "legacy-a,legacy-b", "default", common.ChannelStatusEnabled)
+	require.NoError(t, channel.AddAbilities(nil))
+
+	require.NoError(t, ReconcileModelTimelines())
+
+	assert.Empty(t, announcementsOfType(t, "model_online"), "基线初始化不应发公告")
+	assert.Empty(t, announcementsOfType(t, "model_offline"))
+	assert.NotNil(t, mustTimeline(t, "legacy-a"))
+	assert.NotNil(t, mustTimeline(t, "legacy-b"))
+
+	// 基线标记写入后，后续新模型才会真正发公告
+	channel2 := newTestChannel(t, 21, "fresh-model", "default", common.ChannelStatusEnabled)
+	require.NoError(t, channel2.AddAbilities(nil))
+	require.NoError(t, ReconcileModelTimelines())
+
+	online := announcementsOfType(t, "model_online")
+	require.Len(t, online, 1)
+	assert.Equal(t, "模型 fresh-model 已上线", online[0].Content)
+}
+
+// 新建渠道走 AddAbilities（BatchInsertChannels 路径），应即时生成上线公告
+func TestModelTimeline_BatchInsertChannelAnnounces(t *testing.T) {
+	clearTimelineTables(t)
+
+	priority := int64(0)
+	weight := uint(0)
+	channels := []Channel{{
+		Id:          22,
+		Type:        1,
+		Key:         "k",
+		Name:        "batch",
+		Status:      common.ChannelStatusEnabled,
+		Models:      "brand-new-model",
+		Group:       "default",
+		Priority:    &priority,
+		Weight:      &weight,
+		CreatedTime: common.GetTimestamp(),
+	}}
+	require.NoError(t, BatchInsertChannels(channels))
+
+	online := announcementsOfType(t, "model_online")
+	require.Len(t, online, 1, "新建渠道应即时发出上线公告")
+	assert.Equal(t, "模型 brand-new-model 已上线", online[0].Content)
+	assert.NotNil(t, mustTimeline(t, "brand-new-model"))
 }
 
 // newTestChannel 构造一个用于 UpdateAbilities 的渠道，并写入 channels 表

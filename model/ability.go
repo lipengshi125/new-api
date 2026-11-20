@@ -266,12 +266,6 @@ func (channel *Channel) UpdateAbilities(tx *gorm.DB) error {
 		return err
 	}
 
-	// 创建旧模型的集合
-	oldModelsSet := make(map[string]bool)
-	for _, ability := range oldAbilities {
-		oldModelsSet[ability.Model] = ability.Enabled
-	}
-
 	// First delete all abilities of this channel
 	err = tx.Where("channel_id = ?", channel.Id).Delete(&Ability{}).Error
 	if err != nil {
@@ -286,14 +280,12 @@ func (channel *Channel) UpdateAbilities(tx *gorm.DB) error {
 	groups_ := strings.Split(channel.Group, ",")
 	abilitySet := make(map[string]struct{})
 	abilities := make([]Ability, 0, len(models_))
-	newModelsSet := make(map[string]bool)
 
 	for _, model := range models_ {
 		model = strings.TrimSpace(model)
 		if model == "" {
 			continue
 		}
-		newModelsSet[model] = channel.Status == common.ChannelStatusEnabled
 
 		for _, group := range groups_ {
 			key := group + "|" + model
@@ -332,19 +324,31 @@ func (channel *Channel) UpdateAbilities(tx *gorm.DB) error {
 		if err != nil {
 			return err
 		}
-		// 事务提交成功后，更新模型时间线和公告
-		updateModelTimelineAndAnnouncements(oldModelsSet, newModelsSet)
+		// 事务提交成功后对账时间线：可见模型集合的变化会生成上线/下线公告
+		if err := ReconcileModelTimelines(); err != nil {
+			common.SysLog("failed to reconcile model timelines: " + err.Error())
+		}
 	}
 
 	return nil
 }
 
 func UpdateAbilityStatus(channelId int, status bool) error {
-	return DB.Model(&Ability{}).Where("channel_id = ?", channelId).Select("enabled").Update("enabled", status).Error
+	err := DB.Model(&Ability{}).Where("channel_id = ?", channelId).Select("enabled").Update("enabled", status).Error
+	if err != nil {
+		return err
+	}
+	reconcileTimelinesSafe()
+	return nil
 }
 
 func UpdateAbilityStatusByTag(tag string, status bool) error {
-	return DB.Model(&Ability{}).Where("tag = ?", tag).Select("enabled").Update("enabled", status).Error
+	err := DB.Model(&Ability{}).Where("tag = ?", tag).Select("enabled").Update("enabled", status).Error
+	if err != nil {
+		return err
+	}
+	reconcileTimelinesSafe()
+	return nil
 }
 
 func UpdateAbilityByTag(tag string, newTag *string, priority *int64, weight *uint) error {
@@ -419,95 +423,3 @@ func FixAbility() (int, int, error) {
 	return successCount, failCount, nil
 }
 
-// countEnabledChannelsForModel 统计当前启用某模型的渠道数量。
-// 注意必须按 channel_id 去重：一个渠道配置多个分组时，同一模型会在
-// abilities 里产生多行（group|model 组合主键），直接 Count 行数会把
-// 单渠道误判成多渠道。
-func countEnabledChannelsForModel(model string) int64 {
-	var count int64
-	DB.Model(&Ability{}).
-		Where("model = ? AND enabled = ?", model, true).
-		Distinct("channel_id").
-		Count(&count)
-	return count
-}
-
-// updateModelTimelineAndAnnouncements 更新模型时间线和系统公告
-func updateModelTimelineAndAnnouncements(oldModels, newModels map[string]bool) {
-	// 检测新上线的模型
-	for model, enabled := range newModels {
-		if !enabled {
-			continue
-		}
-
-		oldEnabled, existed := oldModels[model]
-		if existed && oldEnabled {
-			// 该渠道本来就是启用的，不是新的上线事件
-			continue
-		}
-
-		// 只有当前这一个启用渠道时，才算“模型对用户可见”的上线事件；
-		// 若其他渠道早已启用，模型本来就在模型广场里，不重复公告。
-		if countEnabledChannelsForModel(model) != 1 {
-			continue
-		}
-
-		timeline, err := GetModelTimeline(model)
-		if err != nil {
-			common.SysLog(fmt.Sprintf("failed to get model timeline: model=%s, error=%v", model, err))
-			continue
-		}
-
-		var content string
-		switch {
-		case timeline == nil:
-			content = fmt.Sprintf("模型 %s 已上线", model)
-		case !timeline.IsActive:
-			content = fmt.Sprintf("模型 %s 已重新上线", model)
-		default:
-			// 已有记录且处于激活状态，说明时间线缺失导致的状态漂移，不重复公告
-			continue
-		}
-
-		if err := UpsertModelTimeline(model, true); err != nil {
-			common.SysLog(fmt.Sprintf("failed to update model timeline: model=%s, error=%v", model, err))
-		}
-		if err := CreateSystemAnnouncement("model_online", model, content, false); err != nil {
-			common.SysLog(fmt.Sprintf("failed to create announcement: model=%s, error=%v", model, err))
-		}
-	}
-
-	// 检测下线的模型
-	for model, oldEnabled := range oldModels {
-		if !oldEnabled {
-			continue
-		}
-
-		if newEnabled, exists := newModels[model]; exists && newEnabled {
-			continue
-		}
-
-		// 还有别的渠道在启用同一个模型，模型仍在模型广场里
-		if countEnabledChannelsForModel(model) != 0 {
-			continue
-		}
-
-		// 没有上线记录就不发布下线公告，避免给历史数据刷出无意义的“已下线”
-		timeline, err := GetModelTimeline(model)
-		if err != nil {
-			common.SysLog(fmt.Sprintf("failed to get model timeline: model=%s, error=%v", model, err))
-			continue
-		}
-		if timeline == nil || !timeline.IsActive {
-			continue
-		}
-
-		if err := UpsertModelTimeline(model, false); err != nil {
-			common.SysLog(fmt.Sprintf("failed to update model timeline: model=%s, error=%v", model, err))
-		}
-		content := fmt.Sprintf("模型 %s 已下线", model)
-		if err := CreateSystemAnnouncement("model_offline", model, content, false); err != nil {
-			common.SysLog(fmt.Sprintf("failed to create announcement: model=%s, error=%v", model, err))
-		}
-	}
-}

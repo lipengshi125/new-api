@@ -110,6 +110,21 @@ export async function requestPayment(
 }
 
 /**
+ * Request Alipay official direct payment
+ */
+export async function requestAlipayPayment(
+  request: PaymentRequest
+): Promise<PaymentResponse> {
+  const res = await api.post('/api/user/alipay/pay', request, {
+    skipBusinessError: true,
+  } as Record<string, unknown>)
+  return {
+    ...res.data,
+    url: res.data.url || (res as unknown as { url?: string }).url,
+  }
+}
+
+/**
  * Request Stripe payment
  */
 export async function requestStripePayment(

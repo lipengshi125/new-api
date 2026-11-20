@@ -76,6 +76,14 @@ export function isStripePayment(paymentType: string): boolean {
 }
 
 /**
+ * Check if payment method is Alipay official direct gateway
+ * (distinct from the legacy Epay "alipay" type, which is proxied by Epay)
+ */
+export function isAlipayOfficialPayment(paymentType: string): boolean {
+  return paymentType === PAYMENT_TYPES.ALIPAY_OFFICIAL
+}
+
+/**
  * Check if payment method is Waffo Pancake
  *
  * Pancake is a metered-style payment that goes through a dedicated checkout

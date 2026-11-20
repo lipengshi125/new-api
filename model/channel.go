@@ -449,7 +449,12 @@ func BatchInsertChannels(channels []Channel) error {
 			}
 		}
 	}
-	return tx.Commit().Error
+	if err := tx.Commit().Error; err != nil {
+		return err
+	}
+	// 新建渠道同样会改变模型可见性，需要同步时间线并生成上线公告
+	reconcileTimelinesSafe()
+	return nil
 }
 
 func BatchDeleteChannels(ids []int) error {
@@ -471,7 +476,12 @@ func BatchDeleteChannels(ids []int) error {
 			return err
 		}
 	}
-	return tx.Commit().Error
+	if err := tx.Commit().Error; err != nil {
+		return err
+	}
+	// 删除渠道可能导致模型不再可见，需要同步时间线并生成下线公告
+	reconcileTimelinesSafe()
+	return nil
 }
 
 func (channel *Channel) GetPriority() int64 {
@@ -520,7 +530,11 @@ func (channel *Channel) Insert() error {
 		return err
 	}
 	err = channel.AddAbilities(nil)
-	return err
+	if err != nil {
+		return err
+	}
+	reconcileTimelinesSafe()
+	return nil
 }
 
 func (channel *Channel) Update() error {
@@ -599,7 +613,11 @@ func (channel *Channel) Delete() error {
 		return err
 	}
 	err = channel.DeleteAbilities()
-	return err
+	if err != nil {
+		return err
+	}
+	reconcileTimelinesSafe()
+	return nil
 }
 
 var channelStatusLock sync.Mutex
@@ -783,8 +801,7 @@ func EnableChannelByTag(tag string) error {
 	if err != nil {
 		return err
 	}
-	err = UpdateAbilityStatusByTag(tag, true)
-	return err
+	return UpdateAbilityStatusByTag(tag, true)
 }
 
 func DisableChannelByTag(tag string) error {
@@ -792,8 +809,7 @@ func DisableChannelByTag(tag string) error {
 	if err != nil {
 		return err
 	}
-	err = UpdateAbilityStatusByTag(tag, false)
-	return err
+	return UpdateAbilityStatusByTag(tag, false)
 }
 
 func EditChannelByTag(tag string, newTag *string, modelMapping *string, models *string, group *string, priority *int64, weight *uint, paramOverride *string, headerOverride *string) error {
@@ -869,11 +885,17 @@ func updateChannelUsedQuota(id int, quota int) {
 
 func DeleteChannelByStatus(status int64) (int64, error) {
 	result := DB.Where("status = ?", status).Delete(&Channel{})
+	if result.Error == nil && result.RowsAffected > 0 {
+		reconcileTimelinesSafe()
+	}
 	return result.RowsAffected, result.Error
 }
 
 func DeleteDisabledChannel() (int64, error) {
 	result := DB.Where("status = ? or status = ?", common.ChannelStatusAutoDisabled, common.ChannelStatusManuallyDisabled).Delete(&Channel{})
+	if result.Error == nil && result.RowsAffected > 0 {
+		reconcileTimelinesSafe()
+	}
 	return result.RowsAffected, result.Error
 }
 

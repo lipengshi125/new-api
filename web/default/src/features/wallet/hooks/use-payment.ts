@@ -24,11 +24,13 @@ import {
   calculateAmount,
   calculateStripeAmount,
   calculateWaffoPancakeAmount,
+  requestAlipayPayment,
   requestPayment,
   requestStripePayment,
   isApiSuccess,
 } from '../api'
 import {
+  isAlipayOfficialPayment,
   isStripePayment,
   isWaffoPancakePayment,
   submitPaymentForm,
@@ -83,6 +85,7 @@ export function usePayment() {
         setProcessing(true)
 
         const isStripe = isStripePayment(paymentType)
+        const isAlipayOfficial = isAlipayOfficialPayment(paymentType)
         const amount = Math.floor(topupAmount)
 
         const response = isStripe
@@ -90,14 +93,31 @@ export function usePayment() {
               amount,
               payment_method: 'stripe',
             })
-          : await requestPayment({
-              amount,
-              payment_method: paymentType,
-            })
+          : isAlipayOfficial
+            ? await requestAlipayPayment({
+                amount,
+                payment_method: paymentType,
+              })
+            : await requestPayment({
+                amount,
+                payment_method: paymentType,
+              })
 
         if (!isApiSuccess(response)) {
           toast.error(response.message || i18next.t('Payment request failed'))
           return false
+        }
+
+        // Alipay official returns a ready-made GET URL; redirect the browser.
+        if (isAlipayOfficial) {
+          const url = (response as unknown as { url?: string }).url
+          if (!url) {
+            toast.error(i18next.t('Payment request failed'))
+            return false
+          }
+          window.location.href = url
+          toast.success(i18next.t('Redirecting to payment page...'))
+          return true
         }
 
         // Handle Stripe payment

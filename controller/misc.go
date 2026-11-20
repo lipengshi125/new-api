@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -129,7 +131,7 @@ func GetStatus(c *gin.Context) {
 		data["api_info"] = console_setting.GetApiInfo()
 	}
 	if cs.AnnouncementsEnabled {
-		data["announcements"] = console_setting.GetAnnouncements()
+		data["announcements"] = mergeAutoModelAnnouncements(console_setting.GetAnnouncements())
 	}
 	if cs.FAQEnabled {
 		data["faq"] = console_setting.GetFAQ()
@@ -169,6 +171,47 @@ func GetStatus(c *gin.Context) {
 		"data":    data,
 	})
 	return
+}
+
+// mergeAutoModelAnnouncements 把模型上线/下线自动公告合并进控制台公告列表，
+// 供前端时间线统一展示。手动公告保持原有结构，自动公告以 "auto-<id>" 作为
+// 前端去重键，避免与手动公告的数字 id 冲突。
+func mergeAutoModelAnnouncements(manual []map[string]interface{}) []map[string]interface{} {
+	autoList, err := model.GetRecentAutoAnnouncements(20)
+	if err != nil {
+		common.SysLog("failed to load auto model announcements: " + err.Error())
+		return manual
+	}
+
+	merged := make([]map[string]interface{}, 0, len(manual)+len(autoList))
+	merged = append(merged, manual...)
+	for _, a := range autoList {
+		announcementType := "success"
+		if a.Type == "model_offline" {
+			announcementType = "warning"
+		}
+		merged = append(merged, map[string]interface{}{
+			"id":          fmt.Sprintf("auto-%d", a.ID),
+			"content":     a.Content,
+			"publishDate": time.Unix(a.CreatedTime, 0).Format(time.RFC3339),
+			"type":        announcementType,
+			"extra":       a.Model,
+		})
+	}
+
+	sort.SliceStable(merged, func(i, j int) bool {
+		return announcementPublishTime(merged[i]).After(announcementPublishTime(merged[j]))
+	})
+	return merged
+}
+
+func announcementPublishTime(item map[string]interface{}) time.Time {
+	if s, ok := item["publishDate"].(string); ok {
+		if t, err := time.Parse(time.RFC3339, s); err == nil {
+			return t
+		}
+	}
+	return time.Time{}
 }
 
 func GetNotice(c *gin.Context) {
