@@ -126,6 +126,18 @@ export function sortModels(
     case SORT_OPTIONS.PRICE_HIGH:
       sorted.sort((a, b) => getModelPrice(b) - getModelPrice(a))
       break
+    case SORT_OPTIONS.LAUNCH_TIME:
+      // Sort by first_enabled timestamp (newest first, then by name)
+      sorted.sort((a, b) => {
+        const timeA = a.first_enabled || 0
+        const timeB = b.first_enabled || 0
+        if (timeB !== timeA) {
+          return timeB - timeA // Newest first
+        }
+        // If same time or both missing, sort by name
+        return (a.model_name || '').localeCompare(b.model_name || '')
+      })
+      break
   }
 
   return sorted

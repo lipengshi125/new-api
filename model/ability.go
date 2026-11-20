@@ -256,8 +256,24 @@ func (channel *Channel) UpdateAbilities(tx *gorm.DB) error {
 		}()
 	}
 
+	// 获取旧的模型列表，用于检测变化
+	var oldAbilities []Ability
+	err := tx.Where("channel_id = ?", channel.Id).Find(&oldAbilities).Error
+	if err != nil {
+		if isNewTx {
+			tx.Rollback()
+		}
+		return err
+	}
+
+	// 创建旧模型的集合
+	oldModelsSet := make(map[string]bool)
+	for _, ability := range oldAbilities {
+		oldModelsSet[ability.Model] = ability.Enabled
+	}
+
 	// First delete all abilities of this channel
-	err := tx.Where("channel_id = ?", channel.Id).Delete(&Ability{}).Error
+	err = tx.Where("channel_id = ?", channel.Id).Delete(&Ability{}).Error
 	if err != nil {
 		if isNewTx {
 			tx.Rollback()
@@ -270,7 +286,15 @@ func (channel *Channel) UpdateAbilities(tx *gorm.DB) error {
 	groups_ := strings.Split(channel.Group, ",")
 	abilitySet := make(map[string]struct{})
 	abilities := make([]Ability, 0, len(models_))
+	newModelsSet := make(map[string]bool)
+
 	for _, model := range models_ {
+		model = strings.TrimSpace(model)
+		if model == "" {
+			continue
+		}
+		newModelsSet[model] = channel.Status == common.ChannelStatusEnabled
+
 		for _, group := range groups_ {
 			key := group + "|" + model
 			if _, exists := abilitySet[key]; exists {
@@ -304,7 +328,12 @@ func (channel *Channel) UpdateAbilities(tx *gorm.DB) error {
 
 	// 如果是新创建的事务，需要提交
 	if isNewTx {
-		return tx.Commit().Error
+		err = tx.Commit().Error
+		if err != nil {
+			return err
+		}
+		// 事务提交成功后，更新模型时间线和公告
+		updateModelTimelineAndAnnouncements(oldModelsSet, newModelsSet)
 	}
 
 	return nil
@@ -388,4 +417,83 @@ func FixAbility() (int, int, error) {
 	}
 	InitChannelCache()
 	return successCount, failCount, nil
+}
+
+// updateModelTimelineAndAnnouncements 更新模型时间线和系统公告
+func updateModelTimelineAndAnnouncements(oldModels, newModels map[string]bool) {
+	// 检测新上线的模型
+	for model, enabled := range newModels {
+		if !enabled {
+			continue
+		}
+
+		oldEnabled, existed := oldModels[model]
+
+		// 检查该模型是否已经在其他渠道中启用
+		var count int64
+		DB.Model(&Ability{}).Where("model = ? AND enabled = ?", model, true).Count(&count)
+
+		if !existed || !oldEnabled {
+			// 如果这是首次在任何渠道启用，记录时间线和公告
+			if count == 1 { // 只有当前这一个启用的记录
+				timeline, _ := GetModelTimeline(model)
+				if timeline == nil {
+					// 首次上线
+					err := UpsertModelTimeline(model, true)
+					if err != nil {
+						common.SysLog(fmt.Sprintf("Failed to update model timeline for %s: %v", model, err))
+					}
+
+					// 创建上线公告
+					content := fmt.Sprintf("模型 %s 已上线", model)
+					err = CreateSystemAnnouncement("model_online", model, content, false)
+					if err != nil {
+						common.SysLog(fmt.Sprintf("Failed to create announcement for model %s: %v", model, err))
+					}
+				} else if !timeline.IsActive {
+					// 重新上线
+					err := UpsertModelTimeline(model, true)
+					if err != nil {
+						common.SysLog(fmt.Sprintf("Failed to update model timeline for %s: %v", model, err))
+					}
+
+					content := fmt.Sprintf("模型 %s 已重新上线", model)
+					err = CreateSystemAnnouncement("model_online", model, content, false)
+					if err != nil {
+						common.SysLog(fmt.Sprintf("Failed to create announcement for model %s: %v", model, err))
+					}
+				}
+			}
+		}
+	}
+
+	// 检测下线的模型
+	for model, oldEnabled := range oldModels {
+		if !oldEnabled {
+			continue
+		}
+
+		newEnabled, exists := newModels[model]
+		if exists && newEnabled {
+			continue
+		}
+
+		// 检查是否所有渠道都禁用了该模型
+		var count int64
+		DB.Model(&Ability{}).Where("model = ? AND enabled = ?", model, true).Count(&count)
+
+		if count == 0 {
+			// 所有渠道都禁用了，创建下线公告
+			err := UpsertModelTimeline(model, false)
+			if err != nil {
+				common.SysLog(fmt.Sprintf("Failed to update model timeline for %s: %v", model, err))
+			}
+
+			content := fmt.Sprintf("模型 %s 已下线", model)
+			err = CreateSystemAnnouncement("model_offline", model, content, false)
+			if err != nil {
+				common.SysLog(fmt.Sprintf("Failed to create announcement for model %s: %v", model, err))
+			}
+		}
+	}
 }

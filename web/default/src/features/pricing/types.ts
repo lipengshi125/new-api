@@ -58,6 +58,8 @@ export type PricingModel = {
   billing_unit?: string
   /** Pricing version returned by backend, useful for cache busting */
   pricing_version?: string
+  /** First enabled timestamp (used for launch time sorting) */
+  first_enabled?: number
   /** Custom ratios: parameter name -> (parameter value -> ratio multiplier) */
   custom_ratios?: Record<string, Record<string, number>>
   // 固定加价（美元，加到单价上而非相乘）：param_name -> param_value -> USD

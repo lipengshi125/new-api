@@ -52,6 +52,26 @@ func GetTopUpInfo(c *gin.Context) {
 		}
 	}
 
+	// 支付宝官方直连
+	enableAlipay := isAlipayTopUpEnabled()
+	if enableAlipay {
+		hasAlipay := false
+		for _, method := range payMethods {
+			if method["type"] == model.PaymentMethodAlipay {
+				hasAlipay = true
+				break
+			}
+		}
+		if !hasAlipay {
+			payMethods = append(payMethods, map[string]string{
+				"name":      "支付宝",
+				"type":      model.PaymentMethodAlipay,
+				"color":     "rgba(var(--semi-blue-5), 1)",
+				"min_topup": strconv.Itoa(operation_setting.MinTopUp),
+			})
+		}
+	}
+
 	// Waffo Pancake displayed above the legacy Waffo gateway.
 	enableWaffoPancake := isWaffoPancakeTopUpEnabled()
 	if enableWaffoPancake {

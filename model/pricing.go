@@ -42,6 +42,7 @@ type Pricing struct {
 	BillingExpr            string                        `json:"billing_expr,omitempty"`
 	BillingUnit            string                        `json:"billing_unit,omitempty"`
 	PricingVersion         string                        `json:"pricing_version,omitempty"`
+	FirstEnabled           int64                         `json:"first_enabled,omitempty"` // 首次启用时间戳
 	// CodeSamples holds this model's call-sample overrides, keyed by endpoint
 	// type then language. Absent entries fall back to the global templates
 	// returned alongside the pricing payload, then to the built-in samples.
@@ -207,6 +208,15 @@ func updatePricing() {
 		// auto-generated sections, so pricing must still be built.
 		common.SysLog(fmt.Sprintf("GetModelAPIDocNameSet error: %v", err))
 	}
+
+	// 预加载模型时间线数据
+	var allTimelines []ModelTimeline
+	_ = DB.Find(&allTimelines).Error
+	timelineMap := make(map[string]int64)
+	for _, timeline := range allTimelines {
+		timelineMap[timeline.Model] = timeline.FirstEnabled
+	}
+
 	metaMap := make(map[string]*Model)
 	prefixList := make([]*Model, 0)
 	suffixList := make([]*Model, 0)
@@ -380,6 +390,11 @@ func updatePricing() {
 			ModelName:              model,
 			EnableGroup:            groups.Items(),
 			SupportedEndpointTypes: modelSupportEndpointTypes[model],
+		}
+
+		// 填充首次启用时间
+		if firstEnabled, ok := timelineMap[model]; ok {
+			pricing.FirstEnabled = firstEnabled
 		}
 
 		// 补充模型元数据（描述、标签、供应商、状态）

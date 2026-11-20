@@ -77,6 +77,7 @@ func SetApiRouter(router *gin.Engine) {
 			userRoute.GET("/logout", controller.Logout)
 			userRoute.POST("/epay/notify", anonymousRequestBodyLimit, controller.EpayNotify)
 			userRoute.GET("/epay/notify", controller.EpayNotify)
+			userRoute.POST("/payment/alipay/notify", anonymousRequestBodyLimit, controller.AlipayNotify)
 			userRoute.GET("/groups", controller.GetUserGroups)
 
 			selfRoute := userRoute.Group("/")
@@ -99,6 +100,7 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.GET("/topup/self", controller.GetUserTopUps)
 				selfRoute.POST("/topup", middleware.CriticalRateLimit(), controller.TopUp)
 				selfRoute.POST("/pay", middleware.CriticalRateLimit(), controller.RequestEpay)
+				selfRoute.POST("/alipay/pay", middleware.CriticalRateLimit(), controller.RequestAlipayPay)
 				selfRoute.POST("/amount", controller.RequestAmount)
 				selfRoute.POST("/stripe/pay", middleware.CriticalRateLimit(), controller.RequestStripePay)
 				selfRoute.POST("/stripe/amount", controller.RequestStripeAmount)
@@ -229,6 +231,21 @@ func SetApiRouter(router *gin.Engine) {
 			ratioSyncRoute.GET("/channels", controller.GetSyncableChannels)
 			ratioSyncRoute.POST("/fetch", controller.FetchUpstreamRatios)
 		}
+
+		// System announcements and model timeline routes
+		announcementRoute := apiRouter.Group("/announcement")
+		{
+			announcementRoute.GET("/", controller.GetSystemAnnouncements)
+			announcementRoute.POST("/", middleware.AdminAuth(), controller.CreateManualAnnouncement)
+			announcementRoute.PUT("/:id", middleware.AdminAuth(), controller.UpdateSystemAnnouncement)
+			announcementRoute.DELETE("/:id", middleware.AdminAuth(), controller.DeleteSystemAnnouncement)
+		}
+		modelTimelineRoute := apiRouter.Group("/model_timeline")
+		modelTimelineRoute.Use(middleware.AdminAuth())
+		{
+			modelTimelineRoute.GET("/", controller.GetModelTimelines)
+		}
+
 		registerChannelRoutes(apiRouter)
 		registerAuthzRoutes(apiRouter)
 		tokenRoute := apiRouter.Group("/token")
