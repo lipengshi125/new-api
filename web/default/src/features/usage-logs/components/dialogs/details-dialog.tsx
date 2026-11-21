@@ -247,6 +247,12 @@ function BillingBreakdown(props: {
       if (m.count) value = t('{{count}} items', { count: m.count })
       rows.push({ label: m.name, value: `${value} ×${m.ratio}` })
     }
+    for (const m of taskExpr.item_charges ?? []) {
+      const value = m.count
+        ? t('{{count}} items', { count: m.count })
+        : t('Not provided')
+      rows.push({ label: m.name, value: `${value} +$${m.charge_usd}` })
+    }
   } else if (isTieredExpr) {
     rows.push({
       label: t('Billing Mode'),

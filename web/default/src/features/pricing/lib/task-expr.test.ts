@@ -173,6 +173,111 @@ describe('parseTaskExprPricing', () => {
     )
   })
 
+  test('chained multipliers inside tier() followed by an item charge', () => {
+    assert.deepEqual(
+      parseTaskExprPricing(
+        'tier("base", 20000 * (param("resolution") == "1k" ? 1 : 1) * (param("resolution") == "2k" ? 1 : 1) * (param("resolution") == "4k" ? 1.6 : 1) + item_count("images") * 50000)'
+      ),
+      {
+        unit: 'request',
+        unitPrice: 0,
+        extraBasePrice: 0.02,
+        extraFixedCharge: 0,
+        secondsSources: [],
+        itemCharges: { images: 0.05 },
+        multipliers: [
+          { name: 'resolution', value: '1k', ratio: 1 },
+          { name: 'resolution', value: '2k', ratio: 1 },
+          { name: 'resolution', value: '4k', ratio: 1.6 },
+        ],
+      }
+    )
+
+    // 没有加法、只有 tier 内的链式倍率也能识别
+    assert.deepEqual(
+      parseTaskExprPricing(
+        'tier("base", 20000 * (param("resolution") == "1k" ? 1 : 1) * (param("resolution") == "4k" ? 1.6 : 1))'
+      ),
+      {
+        unit: 'request',
+        unitPrice: 0,
+        extraBasePrice: 0.02,
+        extraFixedCharge: 0,
+        secondsSources: [],
+        itemCharges: {},
+        multipliers: [
+          { name: 'resolution', value: '1k', ratio: 1 },
+          { name: 'resolution', value: '4k', ratio: 1.6 },
+        ],
+      }
+    )
+  })
+
+  test('chained multipliers with a non-1 ratio and an item charge in tier()', () => {
+    assert.deepEqual(
+      parseTaskExprPricing(
+        'tier("base", 15000 * (param("resolution") == "1k" ? 1 : 1) * (param("resolution") == "2k" ? 2 : 1) + item_count("images") * 50000)'
+      ),
+      {
+        unit: 'request',
+        unitPrice: 0,
+        extraBasePrice: 0.015,
+        extraFixedCharge: 0,
+        secondsSources: [],
+        itemCharges: { images: 0.05 },
+        multipliers: [
+          { name: 'resolution', value: '1k', ratio: 1 },
+          { name: 'resolution', value: '2k', ratio: 2 },
+        ],
+      }
+    )
+  })
+
+  test('item charge added after the multiplier chain outside tier()', () => {
+    assert.deepEqual(
+      parseTaskExprPricing(
+        '(tier("base", 20000)) * (param("resolution") == "1k" ? 1 : 1) * (param("resolution") == "2k" ? 1 : 1) * (param("resolution") == "4k" ? 1.6 : 1) + item_count("images") * 50000'
+      ),
+      {
+        unit: 'request',
+        unitPrice: 0.02,
+        extraBasePrice: 0,
+        extraFixedCharge: 0,
+        secondsSources: [],
+        itemCharges: { images: 0.05 },
+        multipliers: [
+          { name: 'resolution', value: '1k', ratio: 1 },
+          { name: 'resolution', value: '2k', ratio: 1 },
+          { name: 'resolution', value: '4k', ratio: 1.6 },
+        ],
+      }
+    )
+  })
+
+  test('five resolution tiers plus another parameter multiplier', () => {
+    assert.deepEqual(
+      parseTaskExprPricing(
+        'tier("base", 15000 * (param("resolution") == "1k" ? 1 : 1) * (param("resolution") == "2k" ? 1.2 : 1) * (param("resolution") == "4k" ? 1.6 : 1) * (param("resolution") == "8k" ? 2.4 : 1) * (param("resolution") == "16k" ? 3.2 : 1) * (param("quality") == "pro" ? 1.2 : 1) + item_count("images") * 50000)'
+      ),
+      {
+        unit: 'request',
+        unitPrice: 0,
+        extraBasePrice: 0.015,
+        extraFixedCharge: 0,
+        secondsSources: [],
+        itemCharges: { images: 0.05 },
+        multipliers: [
+          { name: 'resolution', value: '1k', ratio: 1 },
+          { name: 'resolution', value: '2k', ratio: 1.2 },
+          { name: 'resolution', value: '4k', ratio: 1.6 },
+          { name: 'resolution', value: '8k', ratio: 2.4 },
+          { name: 'resolution', value: '16k', ratio: 3.2 },
+          { name: 'quality', value: 'pro', ratio: 1.2 },
+        ],
+      }
+    )
+  })
+
 })
 
 describe('groupTaskMultipliers', () => {

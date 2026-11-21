@@ -53,6 +53,13 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 			}
 			parts = append(parts, fmt.Sprintf("%s=%s ×%s", m.Name, value, strconv.FormatFloat(m.Ratio, 'f', -1, 64)))
 		}
+		for _, m := range exprBilling.ItemCharges {
+			value := "未传"
+			if m.Count > 0 {
+				value = fmt.Sprintf("%d个", m.Count)
+			}
+			parts = append(parts, fmt.Sprintf("%s=%s +$%s", m.Name, value, strconv.FormatFloat(m.ChargeUSD, 'f', -1, 64)))
+		}
 		logContent = fmt.Sprintf("%s，表达式计费：%s", logContent, strings.Join(parts, "，"))
 	} else if common.StringsContains(constant.TaskPricePatches, info.OriginModelName) {
 		if s := info.PriceData.OtherRatios()["seconds"]; s > 0 {
@@ -119,6 +126,9 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo) {
 		}
 		if exprBilling.HasInputSeconds {
 			taskExpr["input_seconds"] = exprBilling.InputSeconds
+		}
+		if len(exprBilling.ItemCharges) > 0 {
+			taskExpr["item_charges"] = exprBilling.ItemCharges
 		}
 		other["task_expr"] = taskExpr
 	}

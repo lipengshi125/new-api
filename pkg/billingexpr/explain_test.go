@@ -76,3 +76,23 @@ func TestExplainParamMultipliersIgnoresTierOnlyExpr(t *testing.T) {
 	got := ExplainParamMultipliers(`tier("base", p * 2 + c * 8)`, RequestInput{Body: []byte(`{"resolution":"720p"}`)})
 	assert.Empty(t, got)
 }
+
+// TestExplainMultipliersAndChargesInsideTier pins that multipliers written
+// inside tier()'s price argument (the additive per-item form) are still shown
+// in the consume log, and that item_count charges are explained with the
+// request's actual element count.
+func TestExplainMultipliersAndChargesInsideTier(t *testing.T) {
+	const exprStr = `tier("base", 20000 * (param("resolution") == "1k" ? 1 : 1) * (param("resolution") == "4k" ? 1.6 : 1) + item_count("images") * 50000)`
+	body := []byte(`{"resolution":"4k","images":["a","b",""]}`)
+
+	assert.Equal(t, []ParamMultiplier{
+		{Name: "resolution", Value: "4k", Ratio: 1.6},
+	}, ExplainParamMultipliers(exprStr, RequestInput{Body: body}))
+
+	assert.Equal(t, []ParamMultiplier{
+		{Name: "images", Count: 2, ChargeUSD: 0.1},
+	}, ExplainItemCharges(exprStr, RequestInput{Body: body}))
+
+	// 没有上传图片时不产生加价项
+	assert.Empty(t, ExplainItemCharges(exprStr, RequestInput{Body: []byte(`{"resolution":"1k"}`)}))
+}

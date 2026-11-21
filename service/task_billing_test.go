@@ -14,6 +14,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/types"
 	"github.com/glebarez/sqlite"
@@ -880,4 +881,42 @@ func TestLogTaskConsumption_ExprSecondsDisplay(t *testing.T) {
 			assert.Equal(t, tt.wantOutput, hasOutput)
 		})
 	}
+}
+
+// TestLogTaskConsumption_ExprMultipliersAndCharges pins that expression billing
+// written inside tier() (multipliers + item_count charges) is not left blank in
+// the consume log content.
+func TestLogTaskConsumption_ExprMultipliersAndCharges(t *testing.T) {
+	truncate(t)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images", nil)
+
+	billing := relaycommon.TaskExprBilling{
+		Multipliers: []billingexpr.ParamMultiplier{
+			{Name: "resolution", Value: "4k", Ratio: 1.6},
+		},
+		ItemCharges: []billingexpr.ParamMultiplier{
+			{Name: "images", Count: 2, ChargeUSD: 0.1},
+		},
+	}
+	info := &relaycommon.RelayInfo{
+		UserId:          1,
+		OriginModelName: "seedance-2.0",
+		TaskExprBilling: &billing,
+		TaskRelayInfo:   &relaycommon.TaskRelayInfo{Action: "generate"},
+		ChannelMeta:     &relaycommon.ChannelMeta{},
+	}
+
+	LogTaskConsumption(c, info)
+
+	log := getLastLog(t)
+	require.NotNil(t, log)
+	assert.Equal(t, "操作 generate，表达式计费：resolution=4k ×1.6，images=2个 +$0.1", log.Content)
+
+	var other map[string]any
+	require.NoError(t, common.UnmarshalJsonStr(log.Other, &other))
+	taskExpr, ok := other["task_expr"].(map[string]any)
+	require.True(t, ok)
+	assert.NotNil(t, taskExpr["item_charges"])
 }

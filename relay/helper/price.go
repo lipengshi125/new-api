@@ -345,6 +345,7 @@ func ModelPriceHelperTieredTask(c *gin.Context, info *relaycommon.RelayInfo) (ty
 		HasOutputSeconds: hasOutputSeconds,
 		OutputSeconds:    outputSeconds,
 		Multipliers:      billingexpr.ExplainParamMultipliers(exprStr, requestInput),
+		ItemCharges:      billingexpr.ExplainItemCharges(exprStr, requestInput),
 		MediaSeconds:     requestInput.MediaSeconds,
 	}
 

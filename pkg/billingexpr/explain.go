@@ -18,8 +18,9 @@ type ParamMultiplier struct {
 	ChargeUSD float64 `json:"charge_usd,omitempty"` // 固定加价（美元），与 Ratio 互斥
 }
 
-// ExplainParamMultipliers 解析表达式顶层的乘法因子，找出形如
-// (param("x") == "v" ? 1.75 : 1) 的条件倍率，并按本次请求求值，
+// ExplainParamMultipliers 在整个表达式中查找形如
+// (param("x") == "v" ? 1.75 : 1) 的条件倍率——不论它写在 tier() 外面还是
+// tier() 的价格参数里（tier("base", K * (...) + ...)），并按本次请求求值，
 // 返回每个参数实际生效的倍率（同一参数的多个因子相乘）。
 // 未命中的参数记为 ×1，使"参数值 → 倍率"在日志中完整可见。
 // 仅用于展示：求值失败的因子会被忽略，不影响计费结果。
@@ -32,18 +33,30 @@ func ExplainParamMultipliers(exprStr string, request RequestInput) []ParamMultip
 	compileEnv := getCompileEnv(version)
 	runtimeEnv := newRuntimeEnv(TokenParams{}, request, &TraceResult{})
 
-	var factors []ast.Node
-	collectMultiplyFactors(prog.Node(), &factors)
+	// 遍历整棵树：倍率既可以写在 tier() 外（tier(...) * (cond)），
+	// 也可以写在 tier() 的价格参数里（tier("base", K * (cond) + ...)）。
+	var conditionals []*ast.ConditionalNode
+	ast.Find(prog.Node(), func(node ast.Node) bool {
+		if cond, ok := node.(*ast.ConditionalNode); ok {
+			conditionals = append(conditionals, cond)
+		}
+		return false
+	})
 
 	var order []string
 	ratios := make(map[string]float64)
-	for _, factor := range factors {
-		cond, ok := factor.(*ast.ConditionalNode)
-		if !ok {
-			continue
-		}
+	for _, cond := range conditionals {
+		// 只认 (param(...) == 值 ? 倍率 : 1) 这种请求倍率写法，
+		// 避免把 tier 的条件分支当成倍率。
 		name := firstParamPath(cond.Cond)
 		if name == "" {
+			continue
+		}
+		if _, ok := numberLiteral(cond.Exp1); !ok {
+			continue
+		}
+		fallback, ok := numberLiteral(cond.Exp2)
+		if !ok || fallback != 1 {
 			continue
 		}
 		matched, ok := evalNode(cond.Cond, compileEnv, runtimeEnv).(bool)
@@ -77,6 +90,80 @@ func ExplainParamMultipliers(exprStr string, request RequestInput) []ParamMultip
 		result = append(result, item)
 	}
 	return result
+}
+
+// ExplainItemCharges 找出表达式中的 item_count("path") * K 与
+// video_count("path") * K（加法计费项），按本次请求统计元素个数，
+// 返回每项实际生效的加价总额（USD，ChargeUSD）。
+// 与 ExplainParamMultipliers 一样仅用于日志展示，不影响计费结果。
+func ExplainItemCharges(exprStr string, request RequestInput) []ParamMultiplier {
+	tree, err := parseExprTree(exprStr)
+	if err != nil {
+		return nil
+	}
+
+	var order []string
+	totals := make(map[string]float64)
+	counts := make(map[string]int)
+	ast.Find(tree, func(node ast.Node) bool {
+		bin, ok := node.(*ast.BinaryNode)
+		if !ok || bin.Operator != "*" {
+			return false
+		}
+		path, perItem, ok := itemChargeFactor(bin.Left, bin.Right)
+		if !ok {
+			path, perItem, ok = itemChargeFactor(bin.Right, bin.Left)
+		}
+		if !ok {
+			return false
+		}
+		if _, seen := totals[path]; !seen {
+			order = append(order, path)
+			count := int(requestItemCount(request.Body, path))
+			counts[path] = count
+		}
+		totals[path] += perItem
+		return false
+	})
+
+	result := make([]ParamMultiplier, 0, len(order))
+	for _, path := range order {
+		amount := totals[path] * float64(counts[path])
+		if amount <= 0 {
+			continue
+		}
+		result = append(result, ParamMultiplier{
+			Name:      path,
+			Count:     counts[path],
+			ChargeUSD: amount,
+		})
+	}
+	return result
+}
+
+// itemChargeFactor 判断 call * coef 是否为 item_count/video_count(path) * K。
+func itemChargeFactor(callNode, coefNode ast.Node) (string, float64, bool) {
+	call, ok := callNode.(*ast.CallNode)
+	if !ok || len(call.Arguments) != 1 {
+		return "", 0, false
+	}
+	callee, ok := call.Callee.(*ast.IdentifierNode)
+	if !ok || (callee.Value != "item_count" && callee.Value != "video_count") {
+		return "", 0, false
+	}
+	arg, ok := call.Arguments[0].(*ast.StringNode)
+	if !ok {
+		return "", 0, false
+	}
+	path := strings.TrimSpace(arg.Value)
+	if path == "" {
+		return "", 0, false
+	}
+	coef, literal := numberLiteral(coefNode)
+	if !literal || coef <= 0 {
+		return "", 0, false
+	}
+	return path, coef / 1_000_000, true
 }
 
 // ExplainUnitPrice 从表达式的 tier 叶子读出基础单价（美元，不含参数倍率与分组倍率），

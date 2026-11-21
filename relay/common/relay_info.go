@@ -705,6 +705,8 @@ type TaskExprBilling struct {
 	UnitPrice   float64
 	Unit        string
 	Multipliers []billingexpr.ParamMultiplier // 参数倍率
+	// ItemCharges 是 item_count/video_count 的按个数加价（ChargeUSD 为总额）
+	ItemCharges []billingexpr.ParamMultiplier
 	// MediaSeconds 是各 video_seconds(path) 的探测结果，渠道重试时复用，避免重复下载
 	MediaSeconds map[string]float64
 }

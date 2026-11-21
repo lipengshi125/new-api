@@ -217,16 +217,12 @@ function parseBase(base: string): ParsedBase | null {
     let extraFixedCharge = 0
     let recognized = true
     for (const term of additiveTerms) {
-      // 1) K * (cond ? r : 1)
-      const inline = parseInlineMultiplierTerm(term)
+      // 1) K * (cond ? r : 1) * (cond ? r : 1) ...（可链式多个倍率）
+      const inline = parseInlineBaseTerm(term)
       if (inline) {
         extraBasePrice += inline.coef / 1_000_000
         extraFixedCharge += inline.constant / 1_000_000
-        inlineMultipliers.push({
-          name: inline.name,
-          value: inline.value,
-          ratio: inline.ratio,
-        })
+        inlineMultipliers.push(...inline.multipliers)
         continue
       }
       // 2) item_count("p") * N / video_count("p") * N
@@ -257,6 +253,20 @@ function parseBase(base: string): ParsedBase | null {
         itemCharges,
         inlineMultipliers,
       }
+    }
+  }
+
+  // 没有加法、只有 tier 内的链式倍率：K * (cond ? r : 1) * (cond ? r : 1)
+  const multiplicative = parseInlineBaseTerm(body)
+  if (multiplicative) {
+    return {
+      unit: 'request',
+      unitPrice: 0,
+      extraBasePrice: multiplicative.coef / 1_000_000,
+      extraFixedCharge: multiplicative.constant / 1_000_000,
+      secondsSources: [],
+      itemCharges: {},
+      inlineMultipliers: multiplicative.multipliers,
     }
   }
 
@@ -301,30 +311,44 @@ function parseMultiplierFactor(factor: string): TaskParamMultiplier | null {
   return { name: m[1], value: m[2] ?? m[3], ratio: Number(m[4]) }
 }
 
-/** 拆出 tier 内的 "A * (cond ? r : 1) + B" 形式：返回系数、倍率因子与常数项 */
-function parseInlineMultiplierTerm(
-  term: string
-): {
+/**
+ * 拆出 tier 内的 "K * (cond ? r : 1) * (cond ? r : 1) [+ 常数]" 形式：
+ * 一个系数、任意多个参数条件倍率、可选常数项。倍率可以链式写多个
+ * （例如同时列出 1k / 2k / 4k 三档），系数不要求写在最前面。
+ */
+function parseInlineBaseTerm(term: string): {
   coef: number
-  name: string
-  value: string
-  ratio: number
+  multipliers: TaskParamMultiplier[]
   constant: number
 } | null {
-  const compact = unwrap(term).replaceAll(/\s+/g, '')
-  const m = compact.match(
-    new RegExp(
-      `^${NUM}\\*\\(param\\(${STR}\\)==${COMPARE_VALUE}\\?${NUM}:1\\)(?:\\+${NUM})?$`
-    )
-  )
-  if (!m) return null
-  return {
-    coef: Number(m[1]),
-    name: m[2],
-    value: m[3] ?? m[4],
-    ratio: Number(m[5]),
-    constant: m[6] != null ? Number(m[6]) : 0,
+  let coef: number | null = null
+  const multipliers: TaskParamMultiplier[] = []
+  let constant = 0
+
+  for (const part of splitTopLevelTerms(unwrap(term))) {
+    const factors = splitTopLevelFactors(part)
+    if (factors.length === 1) {
+      const num = unwrap(factors[0]).match(new RegExp(`^${NUM}$`))
+      if (!num) return null
+      constant += Number(num[1])
+      continue
+    }
+    for (const factor of factors) {
+      const compact = unwrap(factor).replaceAll(/\s+/g, '')
+      const num = compact.match(new RegExp(`^${NUM}$`))
+      if (num) {
+        if (coef !== null) return null
+        coef = Number(num[1])
+        continue
+      }
+      const multiplier = parseMultiplierFactor(compact)
+      if (!multiplier) return null
+      multipliers.push(multiplier)
+    }
   }
+
+  if (coef === null || multipliers.length === 0) return null
+  return { coef, multipliers, constant }
 }
 
 export function parseTaskExprPricing(
@@ -335,7 +359,10 @@ export function parseTaskExprPricing(
   // 含 token 变量的是 token 计费表达式，交给原有的分档展示
   if (TOKEN_VAR_RE.test(body.replaceAll(/"[^"]*"/g, '""'))) return null
 
-  const [base, ...rest] = splitTopLevelFactors(body)
+  // 顶层也可能带加法：tier(...) * 倍率... + item_count("p") * N
+  const additiveParts = splitTopLevelTerms(body)
+  const [basePart, ...extraParts] = additiveParts
+  const [base, ...rest] = splitTopLevelFactors(basePart)
   if (!base) return null
   const parsedBase = parseBase(base)
   if (!parsedBase) return null
@@ -348,13 +375,31 @@ export function parseTaskExprPricing(
     if (!multiplier) return null
     multipliers.push(multiplier)
   }
+
+  // tier(...) 之外的加法项：按个数加价或固定常数
+  const itemCharges: Record<string, number> = { ...parsedBase.itemCharges }
+  let extraFixedCharge = parsedBase.extraFixedCharge ?? 0
+  for (const part of extraParts) {
+    const source = parseSecondsTerm(part)
+    if (source?.kind === 'item_charge') {
+      itemCharges[source.path] = source.chargePerItem
+      continue
+    }
+    const constant = unwrap(part).match(new RegExp(`^${NUM}$`))
+    if (constant) {
+      extraFixedCharge += Number(constant[1]) / 1_000_000
+      continue
+    }
+    return null
+  }
+
   return {
     unit: parsedBase.unit,
     unitPrice: parsedBase.unitPrice,
     extraBasePrice: parsedBase.extraBasePrice ?? 0,
-    extraFixedCharge: parsedBase.extraFixedCharge ?? 0,
+    extraFixedCharge,
     secondsSources: parsedBase.secondsSources,
-    itemCharges: parsedBase.itemCharges || {},
+    itemCharges,
     multipliers,
   }
 }

@@ -249,6 +249,12 @@ export interface LogOtherData {
       count?: number
       ratio: number
     }>
+    // item_count / video_count 按个数加价（charge_usd 为本次总额，美元）
+    item_charges?: Array<{
+      name: string
+      count?: number
+      charge_usd: number
+    }>
   }
   // Subscription billing fields
   subscription_plan_id?: string
