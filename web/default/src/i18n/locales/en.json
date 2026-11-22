@@ -5285,6 +5285,7 @@
     "output seconds": "output seconds",
     "{{name}} multiplier": "{{name}} multiplier",
     "{{video}}s reference video, {{output}}s output": "{{video}}s reference video, {{output}}s output",
+    "{{video}}s reference video": "{{video}}s reference video",
     "{{output}}s output": "{{output}}s output",
     "Values not listed are billed at ×1.": "Values not listed are billed at ×1.",
     "Billing formula": "Billing formula",

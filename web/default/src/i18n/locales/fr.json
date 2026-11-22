@@ -5283,6 +5283,7 @@
     "output seconds": "secondes de sortie",
     "{{name}} multiplier": "multiplicateur {{name}}",
     "{{video}}s reference video, {{output}}s output": "{{video}} s de vidéo de référence, {{output}} s de sortie",
+    "{{video}}s reference video": "{{video}}s reference video",
     "{{output}}s output": "{{output}} s de sortie",
     "Values not listed are billed at ×1.": "Les valeurs non listées sont facturées ×1.",
     "Billing formula": "Formule de facturation",

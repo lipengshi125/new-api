@@ -87,6 +87,9 @@ export function TaskExprPricingDetails(
   )
   const unitLabel = pricing.unit === 'second' ? t('sec') : t('request')
   const hasVideo = pricing.secondsSources.some((s) => s.kind === 'video')
+  // 只有表达式里真有输出时长项（param("duration") 等）才计入输出秒数；
+  // 只按参考视频计费（如 video_seconds("videos")）时示例不能凭空加上输出 5 秒。
+  const hasOutput = pricing.secondsSources.some((s) => s.kind === 'param')
 
   // 公式：单价 × (秒数项之和) × 各参数倍率 × 分组倍率
   const formulaParts = [unitPrice]
@@ -101,8 +104,8 @@ export function TaskExprPricingDetails(
   }
   formulaParts.push(t('group ratio'))
 
-  // 示例：输出 5 秒（有参考视频时再加 5 秒），使用倍率最高的参数值
-  const exampleOutput = 5
+  // 示例：表达式里有的秒数项各取 5 秒（参考视频 / 输出），使用倍率最高的参数值
+  const exampleOutput = hasOutput ? 5 : 0
   const exampleVideo = hasVideo ? 5 : 0
   const exampleSeconds =
     pricing.unit === 'second' ? exampleOutput + exampleVideo : 1
@@ -129,16 +132,28 @@ export function TaskExprPricingDetails(
     props.priceRate,
     props.usdExchangeRate
   )
+  let exampleSecondsCondition = ''
+  if (hasVideo && hasOutput) {
+    exampleSecondsCondition = t(
+      '{{video}}s reference video, {{output}}s output',
+      { video: exampleVideo, output: exampleOutput }
+    )
+  } else if (hasVideo) {
+    exampleSecondsCondition = t('{{video}}s reference video', {
+      video: exampleVideo,
+    })
+  } else if (hasOutput) {
+    exampleSecondsCondition = t('{{output}}s output', { output: exampleOutput })
+  }
+  let exampleSecondsStep = ''
+  if (hasVideo && hasOutput) {
+    exampleSecondsStep = `(${exampleVideo}+${exampleOutput})`
+  } else if (hasVideo || hasOutput) {
+    exampleSecondsStep = String(exampleVideo + exampleOutput)
+  }
   const exampleConditions = [
-    ...(pricing.unit === 'second'
-      ? [
-          hasVideo
-            ? t('{{video}}s reference video, {{output}}s output', {
-                video: exampleVideo,
-                output: exampleOutput,
-              })
-            : t('{{output}}s output', { output: exampleOutput }),
-        ]
+    ...(pricing.unit === 'second' && exampleSecondsCondition
+      ? [exampleSecondsCondition]
       : []),
     ...exampleChoices.map((c) => `${c.name}=${c.value}`),
     ...itemChargeEntries.map(([path]) =>
@@ -148,12 +163,8 @@ export function TaskExprPricingDetails(
   // 计算过程：单价 × 秒数 × 各参数倍率，例如 $0.05×5×2×1.35
   const exampleSteps = [
     unitPrice,
-    ...(pricing.unit === 'second'
-      ? [
-          hasVideo
-            ? `(${exampleVideo}+${exampleOutput})`
-            : String(exampleOutput),
-        ]
+    ...(pricing.unit === 'second' && exampleSecondsStep
+      ? [exampleSecondsStep]
       : []),
     ...exampleChoices.map((c) => formatRatio(c.ratio)),
   ].join('×') +

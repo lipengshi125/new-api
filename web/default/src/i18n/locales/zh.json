@@ -5285,6 +5285,7 @@
     "output seconds": "输出秒数",
     "{{name}} multiplier": "{{name}} 倍率",
     "{{video}}s reference video, {{output}}s output": "参考视频 {{video}} 秒，输出 {{output}} 秒",
+    "{{video}}s reference video": "参考视频 {{video}} 秒",
     "{{output}}s output": "输出 {{output}} 秒",
     "Values not listed are billed at ×1.": "未列出的参数值按 ×1 计费。",
     "Billing formula": "计费公式",

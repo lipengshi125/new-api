@@ -5283,6 +5283,7 @@
     "output seconds": "輸出秒數",
     "{{name}} multiplier": "{{name}} 倍率",
     "{{video}}s reference video, {{output}}s output": "參考影片 {{video}} 秒，輸出 {{output}} 秒",
+    "{{video}}s reference video": "參考影片 {{video}} 秒",
     "{{output}}s output": "輸出 {{output}} 秒",
     "Values not listed are billed at ×1.": "未列出的參數值按 ×1 計費。",
     "Billing formula": "計費公式",

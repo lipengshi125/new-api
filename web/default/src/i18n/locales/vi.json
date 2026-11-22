@@ -5283,6 +5283,7 @@
     "output seconds": "số giây đầu ra",
     "{{name}} multiplier": "hệ số {{name}}",
     "{{video}}s reference video, {{output}}s output": "{{video}} giây video tham chiếu, {{output}} giây đầu ra",
+    "{{video}}s reference video": "{{video}}s reference video",
     "{{output}}s output": "{{output}} giây đầu ra",
     "Values not listed are billed at ×1.": "Các giá trị không được liệt kê tính ×1.",
     "Billing formula": "Công thức tính phí",

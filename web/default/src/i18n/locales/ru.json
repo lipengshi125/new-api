@@ -5283,6 +5283,7 @@
     "output seconds": "секунды вывода",
     "{{name}} multiplier": "множитель {{name}}",
     "{{video}}s reference video, {{output}}s output": "{{video}} с референсного видео, {{output}} с вывода",
+    "{{video}}s reference video": "{{video}}s reference video",
     "{{output}}s output": "{{output}} с вывода",
     "Values not listed are billed at ×1.": "Не указанные значения тарифицируются как ×1.",
     "Billing formula": "Формула расчёта",
