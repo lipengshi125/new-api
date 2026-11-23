@@ -334,7 +334,7 @@ func ResultURL(task *model.Task) string {
 		}
 	}
 	url := strings.TrimSpace(task.PrivateData.ResultURL)
-	if url == "" || strings.Contains(url, "/"+task.TaskID+"/content") {
+	if url == "" || isContentProxyURL(url) {
 		return ""
 	}
 	return url
