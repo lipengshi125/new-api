@@ -95,7 +95,7 @@ func TestParseTaskResultStatusMapping(t *testing.T) {
 
 // TestConvertToOpenAIVideo verifies a stored image task is returned as the
 // upstream payload (same passthrough as /v1/videos/{id}) with the public id,
-// and that metadata.url is the real image URL, never the local content proxy.
+// and that metadata.url is always the local proxy URL — never the upstream CDN.
 func TestConvertToOpenAIVideo(t *testing.T) {
 	adaptor := &TaskAdaptor{}
 
@@ -116,16 +116,17 @@ func TestConvertToOpenAIVideo(t *testing.T) {
 		var got map[string]any
 		require.NoError(t, common.Unmarshal(raw, &got))
 		assert.NotContains(t, string(raw), "upstream_secret")
+		assert.NotContains(t, string(raw), "cdn.example.com")
 		assert.Equal(t, "task_public123", got["id"])
 		assert.Equal(t, "task_public123", got["task_id"])
 		assert.Equal(t, "banana-2", got["model"])
 		assert.Equal(t, dto.VideoStatusCompleted, got["status"])
 		assert.Equal(t, "5", got["seconds"])
 		assert.Equal(t, map[string]any{"duration": float64(6750000)}, got["data"])
-		assert.Equal(t, map[string]any{"url": "https://cdn.example.com/a.jpg"}, got["metadata"])
+		assert.Equal(t, map[string]any{"url": taskcommon.BuildProxyURL("task_public123")}, got["metadata"])
 	})
 
-	t.Run("openai image list fills metadata url", func(t *testing.T) {
+	t.Run("openai image list fills metadata url with proxy", func(t *testing.T) {
 		task := &model.Task{
 			TaskID: "task_list",
 			Status: model.TaskStatusSuccess,
@@ -137,10 +138,11 @@ func TestConvertToOpenAIVideo(t *testing.T) {
 
 		var got dto.OpenAIVideo
 		require.NoError(t, common.Unmarshal(raw, &got))
-		assert.Equal(t, "https://cdn.example.com/a.png", got.Metadata["url"])
+		assert.Equal(t, taskcommon.BuildProxyURL("task_list"), got.Metadata["url"])
+		assert.NotContains(t, string(raw), "cdn.example.com")
 	})
 
-	t.Run("local content proxy url is never exposed", func(t *testing.T) {
+	t.Run("success always uses proxy url not upstream cdn", func(t *testing.T) {
 		task := &model.Task{
 			TaskID: "task_proxy",
 			Status: model.TaskStatusSuccess,
@@ -150,10 +152,13 @@ func TestConvertToOpenAIVideo(t *testing.T) {
 
 		raw, err := adaptor.ConvertToOpenAIVideo(task)
 		require.NoError(t, err)
-		assert.NotContains(t, string(raw), "/content")
+
+		var got dto.OpenAIVideo
+		require.NoError(t, common.Unmarshal(raw, &got))
+		assert.Equal(t, taskcommon.BuildProxyURL("task_proxy"), got.Metadata["url"])
 	})
 
-	t.Run("success falls back to stored result url", func(t *testing.T) {
+	t.Run("success uses proxy url even when only stored result url exists", func(t *testing.T) {
 		task := &model.Task{
 			TaskID: "task_fallback",
 			Status: model.TaskStatusSuccess,
@@ -166,7 +171,8 @@ func TestConvertToOpenAIVideo(t *testing.T) {
 
 		var got dto.OpenAIVideo
 		require.NoError(t, common.Unmarshal(raw, &got))
-		assert.Equal(t, "https://cdn.example.com/fallback.png", got.Metadata["url"])
+		assert.Equal(t, taskcommon.BuildProxyURL("task_fallback"), got.Metadata["url"])
+		assert.NotContains(t, string(raw), "cdn.example.com")
 	})
 
 	t.Run("failure reports error", func(t *testing.T) {
