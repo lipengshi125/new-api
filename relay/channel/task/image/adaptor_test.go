@@ -227,6 +227,7 @@ func TestResultURL(t *testing.T) {
 		{"stored result url fallback", `{"status":"completed"}`, "https://cdn.example.com/c.png", "https://cdn.example.com/c.png"},
 		{"local video proxy is rejected", `{"status":"completed"}`, "https://api.example.com/v1/videos/task_x/content", ""},
 		{"local image proxy is rejected", `{"status":"completed"}`, "https://api.example.com/v1/images/task_x/content", ""},
+		{"upstream relay public content url is kept", `{"video_url":"https://hk.relay.example/v1/videos/vid-1/content"}`, "", "https://hk.relay.example/v1/videos/vid-1/content"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

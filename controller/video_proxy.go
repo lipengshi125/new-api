@@ -93,8 +93,13 @@ func VideoProxy(c *gin.Context) {
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 60*time.Second)
+	// The 60s limit covers connecting and waiting for upstream response headers
+	// only; it is stopped once headers arrive so large files are not cut off
+	// mid-stream. Body streaming ends when the client disconnects.
+	ctx, cancel := context.WithCancel(c.Request.Context())
 	defer cancel()
+	headerTimer := time.AfterFunc(60*time.Second, cancel)
+	defer headerTimer.Stop()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "", nil)
 	if err != nil {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("Failed to create request: %s", err.Error()))
@@ -135,7 +140,10 @@ func VideoProxy(c *gin.Context) {
 	case channel.Type == constant.ChannelTypeOpenAI || channel.Type == constant.ChannelTypeSora:
 		// 若已存储真实结果地址（且不是指向本服务自身的代理端点），优先直连，
 		// 避免再走上游 /content 代理（可能带鉴权/防盗链导致浏览器无法播放）。
-		if resultURL := strings.TrimSpace(task.GetResultURL()); resultURL != "" && !isTaskProxyContentURL(resultURL, taskID) {
+		// ResultURL also reads the URL the upstream reported in its payload
+		// (metadata.url / video_url / data[].url), which Sora polling does not
+		// store; an upstream relay serving an image task may have no /content.
+		if resultURL := taskimage.ResultURL(task); resultURL != "" {
 			videoURL = resultURL
 		} else {
 			videoURL = fmt.Sprintf("%s/v1/videos/%s/content", baseURL, task.GetUpstreamTaskID())
@@ -147,6 +155,12 @@ func VideoProxy(c *gin.Context) {
 	}
 
 	videoURL = strings.TrimSpace(videoURL)
+	if strings.Contains(videoURL, "/"+taskID+"/content") {
+		// Fetching our own /content for this task would request itself forever.
+		logger.LogError(c.Request.Context(), fmt.Sprintf("Video URL for task %s points back to its own proxy: %s", taskID, videoURL))
+		videoProxyError(c, http.StatusBadGateway, "server_error", "Result URL not available for this task")
+		return
+	}
 	if videoURL == "" {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("Video URL is empty for task %s", taskID))
 		videoProxyError(c, http.StatusBadGateway, "server_error", "Failed to fetch video content")
@@ -182,6 +196,7 @@ func VideoProxy(c *gin.Context) {
 	}
 
 	resp, err := client.Do(req)
+	headerTimer.Stop()
 	if err != nil {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("Failed to fetch video from %s: %s", videoURL, err.Error()))
 		videoProxyError(c, http.StatusBadGateway, "server_error", "Failed to fetch video content")

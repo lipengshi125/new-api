@@ -241,38 +241,9 @@ func (a *TaskAdaptor) ConvertToOpenAIVideo(task *model.Task) ([]byte, error) {
 		}
 	}
 
-	var err error
-	if data, err = sjson.SetBytes(data, "id", task.TaskID); err != nil {
-		return nil, errors.Wrap(err, "set id failed")
-	}
-	if data, err = sjson.SetBytes(data, "task_id", task.TaskID); err != nil {
-		return nil, errors.Wrap(err, "set task_id failed")
-	}
-	if data, err = sjson.SetBytes(data, "status", task.Status.ToVideoStatus()); err != nil {
-		return nil, errors.Wrap(err, "set status failed")
-	}
-	// Always show the model the user originally requested, not whatever the
-	// upstream reports (which may be an internal/upstream model name).
-	if originModel := task.Properties.OriginModelName; originModel != "" {
-		if data, err = sjson.SetBytes(data, "model", originModel); err != nil {
-			return nil, errors.Wrap(err, "set model failed")
-		}
-	}
-
-	// Only surface the result URL once the task has completed, and always use
-	// the local proxy URL so the upstream CDN address is never exposed to the
-	// caller. While queued or in progress the field is removed entirely.
-	// Also strip any other URL fields in the payload (data[].url, video_url,
-	// image_url, url at the root) so upstream addresses cannot leak through
-	// alternate paths.
-	if task.Status == model.TaskStatusSuccess {
-		data = redactUpstreamURLFields(data)
-		proxyURL := taskcommon.BuildProxyURL(task.TaskID)
-		if data, err = sjson.SetBytes(data, "metadata.url", proxyURL); err != nil {
-			return nil, errors.Wrap(err, "set metadata.url failed")
-		}
-	} else if gjson.GetBytes(data, "metadata.url").Exists() {
-		data, _ = sjson.DeleteBytes(data, "metadata.url")
+	data, err := taskcommon.PublicVideoResult(data, task)
+	if err != nil {
+		return nil, err
 	}
 
 	if task.Status == model.TaskStatusFailure && !gjson.GetBytes(data, "error").Exists() {
@@ -284,29 +255,7 @@ func (a *TaskAdaptor) ConvertToOpenAIVideo(task *model.Task) ([]byte, error) {
 	return data, nil
 }
 
-// redactUpstreamURLFields removes URL fields from the upstream payload that
-// could expose CDN or upstream-service addresses to callers. The fields
-// stripped are: metadata.url, video_url, image_url, url (root), and url
-// inside every element of a top-level data array.
-func redactUpstreamURLFields(data []byte) []byte {
-	for _, path := range []string{"metadata.url", "video_url", "image_url", "url"} {
-		if gjson.GetBytes(data, path).Exists() {
-			data, _ = sjson.DeleteBytes(data, path)
-		}
-	}
-	// Strip url from each item in data[] (OpenAI image list format).
-	if arr := gjson.GetBytes(data, "data"); arr.IsArray() {
-		for i := range arr.Array() {
-			path := fmt.Sprintf("data.%d.url", i)
-			if gjson.GetBytes(data, path).Exists() {
-				data, _ = sjson.DeleteBytes(data, path)
-			}
-		}
-	}
-	return data
-}
-
-
+// mapUpstreamStatus normalizes the status spellings seen across upstreams onto
 // the OpenAI video status vocabulary. An empty result means "unrecognized" and
 // callers keep polling rather than failing a task that is still running.
 func mapUpstreamStatus(status string) string {
@@ -334,7 +283,7 @@ func ResultURL(task *model.Task) string {
 		}
 	}
 	url := strings.TrimSpace(task.PrivateData.ResultURL)
-	if url == "" || isContentProxyURL(url) {
+	if url == "" || taskcommon.IsOwnProxyURL(url, task.TaskID) {
 		return ""
 	}
 	return url
@@ -342,30 +291,22 @@ func ResultURL(task *model.Task) string {
 
 // resultImageURL finds the image URL in an upstream payload. Upstreams report
 // it as metadata.url, data.url (object) or data[].url (OpenAI image list).
-// URLs that point back to this service's /content proxy are skipped to avoid
-// a request loop when the upstream is another new-api instance.
+// URLs on this service's own host are skipped so the content proxy never
+// requests itself; an upstream relay's public /content URL is kept.
 func resultImageURL(payload gjson.Result) string {
-	for _, path := range []string{"metadata.url", "data.url", "data.#.url", "url", "image_url"} {
+	for _, path := range []string{"metadata.url", "data.url", "data.#.url", "url", "image_url", "video_url"} {
 		value := payload.Get(path)
 		if value.IsArray() {
 			for _, item := range value.Array() {
-				if url := strings.TrimSpace(item.String()); url != "" && !isContentProxyURL(url) {
+				if url := strings.TrimSpace(item.String()); url != "" && !taskcommon.IsOwnProxyURL(url, "") {
 					return url
 				}
 			}
 			continue
 		}
-		if url := strings.TrimSpace(value.String()); url != "" && !isContentProxyURL(url) {
+		if url := strings.TrimSpace(value.String()); url != "" && !taskcommon.IsOwnProxyURL(url, "") {
 			return url
 		}
 	}
 	return ""
-}
-
-// isContentProxyURL reports whether u is a local /v1/videos|images/{id}/content
-// proxy endpoint. These must not be used as upstream fetch targets because they
-// loop back to this service.
-func isContentProxyURL(u string) bool {
-	return strings.Contains(u, "/v1/videos/") && strings.HasSuffix(u, "/content") ||
-		strings.Contains(u, "/v1/images/") && strings.HasSuffix(u, "/content")
 }
