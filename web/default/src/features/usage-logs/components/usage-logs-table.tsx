@@ -186,9 +186,10 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
   const isCommon = logCategory === 'common'
   const isTask = logCategory === 'task'
 
-  // 任务日志：点击行的空白处查看完整 JSON；单元格内的按钮/链接/徽章保持各自行为。
+  // 任务日志：管理员点击行的空白处查看完整 JSON；单元格内的按钮/链接/徽章保持各自行为。
   // 弹窗通过 portal 渲染，React 事件仍会冒泡到行，需用 DOM contains 排除。
   const handleTaskRowClick = (e: MouseEvent<HTMLElement>, log: TaskLog) => {
+    if (!isAdmin) return
     const target = e.target as HTMLElement
     if (!e.currentTarget.contains(target)) return
     if (target.closest(TASK_ROW_INTERACTIVE_SELECTOR)) return
@@ -254,11 +255,11 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
               className={cn(
                 'transition-colors',
                 tintClass,
-                isTask && 'cursor-pointer'
+                isTask && isAdmin && 'cursor-pointer'
               )}
               getColumnClassName={() => (isCommon ? 'py-2' : 'py-3.5')}
               onClick={
-                isTask
+                isTask && isAdmin
                   ? (e) =>
                       handleTaskRowClick(e, row.original as unknown as TaskLog)
                   : undefined
@@ -267,7 +268,7 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
           )
         }}
       />
-      {isTask && (
+      {isTask && isAdmin && (
         <TaskDetailsDialog
           log={selectedTaskLog}
           open={selectedTaskLog != null}

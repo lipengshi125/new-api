@@ -8,13 +8,15 @@ import (
 )
 
 func SetVideoRouter(router *gin.Engine) {
-	// Video proxy: accepts either session auth (dashboard) or token auth (API clients)
-	videoProxyRouter := router.Group("/v1")
-	videoProxyRouter.Use(middleware.RouteTag("relay"))
-	videoProxyRouter.Use(middleware.TokenOrUserAuth())
+	// Video content proxy: public (no auth) so the returned URL can be pasted
+	// directly into a browser to download. The handler resolves the task by id
+	// and streams the bytes from the upstream; ownership was already checked
+	// when the task was created, and the task id is unguessable.
+	videoContentRouter := router.Group("/v1")
+	videoContentRouter.Use(middleware.RouteTag("relay"))
 	{
-		videoProxyRouter.GET("/videos/:task_id/content", controller.VideoProxy)
-		videoProxyRouter.GET("/images/:task_id/content", controller.VideoProxy)
+		videoContentRouter.GET("/videos/:task_id/content", controller.VideoProxy)
+		videoContentRouter.GET("/images/:task_id/content", controller.VideoProxy)
 	}
 
 	videoV1Router := router.Group("/v1")

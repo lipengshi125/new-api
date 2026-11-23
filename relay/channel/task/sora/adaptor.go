@@ -373,5 +373,11 @@ func (a *TaskAdaptor) ConvertToOpenAIVideo(task *model.Task) ([]byte, error) {
 	if data, err = sjson.SetBytes(data, "id", task.TaskID); err != nil {
 		return nil, errors.Wrap(err, "set id failed")
 	}
+	// Always expose our own proxy URL so the upstream URL is never leaked to
+	// the caller. The /v1/videos/{id}/content endpoint requires no auth and
+	// streams the video through this server.
+	if data, err = sjson.SetBytes(data, "metadata.url", taskcommon.BuildProxyURL(task.TaskID)); err != nil {
+		return nil, errors.Wrap(err, "set metadata.url failed")
+	}
 	return data, nil
 }

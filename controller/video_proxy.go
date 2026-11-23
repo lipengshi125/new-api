@@ -38,8 +38,20 @@ func VideoProxy(c *gin.Context) {
 		return
 	}
 
+	// The /content route is public (no token required) so the returned URL can
+	// be opened directly in a browser. Ownership was already enforced when the
+	// task was created, and the task id is unguessable, so resolving by id alone
+	// is safe here. When a token/session is present we still prefer the
+	// user-scoped lookup so dashboard/API callers keep their isolation.
 	userID := c.GetInt("id")
-	task, exists, err := model.GetByTaskId(userID, taskID)
+	var task *model.Task
+	var exists bool
+	var err error
+	if userID > 0 {
+		task, exists, err = model.GetByTaskId(userID, taskID)
+	} else {
+		task, exists, err = model.GetByOnlyTaskId(taskID)
+	}
 	if err != nil {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("Failed to query task %s: %s", taskID, err.Error()))
 		videoProxyError(c, http.StatusInternalServerError, "server_error", "Failed to query task")
